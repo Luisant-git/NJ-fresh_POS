@@ -182,14 +182,16 @@ const BankDepositEntry = () => {
             <div>
               <label className="block text-[12px] font-bold text-gray-700 mb-1">Amount</label>
               <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500 font-bold">{settings?.currencySymbol || 'RM'}</span>
+                <div className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">
+                  <span className="text-gray-600 font-bold text-[14px] leading-none">{settings?.currencySymbol || 'RM'}</span>
+                </div>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-bold bg-white"
+                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-bold bg-white text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="0.00"
                 />
               </div>
