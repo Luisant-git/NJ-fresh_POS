@@ -9,7 +9,8 @@ export const exportTableToPdf = (
   filename: string,
   title?: string,
   shopName?: string,
-  totalCount?: number | string
+  totalCount?: number | string,
+  options?: { footerBold?: boolean }
 ) => {
   try {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -72,10 +73,18 @@ export const exportTableToPdf = (
       alternateRowStyles: {
         fillColor: [248, 250, 252],
       },
+      didParseCell: (data: any) => {
+        const raw = data.row?.raw || {};
+        if (raw.isSubtotal) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = [0, 0, 0];
+          data.cell.styles.fillColor = [241, 245, 249];
+        }
+      },
       footStyles: {
         fillColor: [241, 245, 249],
         textColor: 0,
-        fontStyle: 'bold',
+        fontStyle: options?.footerBold === false ? 'normal' : 'bold',
         fontSize: 9,
       },
       margin: { top: 10, left: 10, right: 10 },

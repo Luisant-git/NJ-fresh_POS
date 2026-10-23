@@ -140,16 +140,18 @@ export class ReportsService {
 
       const qty = Number(item.quantity) || 0;
       const value = Number(item.amount) || 0;
+      const safeQty = Number(qty.toFixed(2));
+      const safeValue = Number(value.toFixed(2));
 
       productGroups[productKey].items.push({
         invoiceNo: item.sale?.invoiceNo || '-',
         date: item.sale?.date || new Date(),
-        qty: qty,
-        value: value,
+        qty: safeQty,
+        value: safeValue,
         saleId: item.saleId
       });
-      productGroups[productKey].totalQty += qty;
-      productGroups[productKey].totalValue += value;
+      productGroups[productKey].totalQty = Number((productGroups[productKey].totalQty + safeQty).toFixed(2));
+      productGroups[productKey].totalValue = Number((productGroups[productKey].totalValue + safeValue).toFixed(2));
     }
 
     return Object.values(productGroups).sort((a: any, b: any) => a.productName.localeCompare(b.productName));

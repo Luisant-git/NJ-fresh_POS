@@ -11,6 +11,11 @@ import { useSettings } from '../../contexts/SettingsContext';
 import SearchableSelect from '../../components/SearchableSelect';
 import { useNavigate } from 'react-router-dom';
 
+const formatQtyValue = (value: number | string) => {
+  const numericValue = Number(value || 0);
+  return Number(numericValue.toFixed(2)).toString();
+};
+
 const ProductWiseSalesReport = () => {
   const { formatCurrency, settings } = useSettings();
   const navigate = useNavigate();
@@ -48,7 +53,7 @@ const ProductWiseSalesReport = () => {
           'Product Name': group.productName,
           'Invoice No': item.invoiceNo,
           'Date': formatMalaysiaDate(item.date),
-          'Qty': item.qty,
+          'Qty': formatQtyValue(item.qty),
           'Sales Value': item.value
         });
       });
@@ -56,7 +61,7 @@ const ProductWiseSalesReport = () => {
         'Product Name': `SUBTOTAL: ${group.productName}`,
         'Invoice No': '',
         'Date': '',
-        'Qty': group.totalQty,
+        'Qty': formatQtyValue(group.totalQty),
         'Sales Value': group.totalValue
       });
     });
@@ -84,20 +89,21 @@ const ProductWiseSalesReport = () => {
           productName: group.productName,
           invoiceNo: item.invoiceNo,
           date: formatMalaysiaDate(item.date),
-          qty: item.qty,
+          qty: formatQtyValue(item.qty),
           value: formatCurrency(item.value)
         });
       });
       pdfData.push({
+        isSubtotal: true,
         productName: `SUBTOTAL: ${group.productName}`,
         invoiceNo: '',
         date: '',
-        qty: group.totalQty.toString(),
+        qty: formatQtyValue(group.totalQty),
         value: formatCurrency(group.totalValue)
       });
     });
 
-    exportTableToPdf(cols, pdfData, `Product_Wise_Sales_${filterFromDate}_to_${filterToDate}`, 'Product Wise Sales Report', settings?.shopName, pdfData.length);
+    exportTableToPdf(cols, pdfData, `Product_Wise_Sales_${filterFromDate}_to_${filterToDate}`, 'Product Wise Sales Report', settings?.shopName, pdfData.length, { footerBold: true });
   };
 
   return (
@@ -212,7 +218,7 @@ const ProductWiseSalesReport = () => {
                               {item.invoiceNo} <span className="text-gray-500 font-bold text-[11px] ml-2">({formatMalaysiaDate(item.date)})</span>
                             </td>
                             <td className="px-4 py-1.5 border-r border-[#E2E8F0] text-right text-black font-bold">
-                              {item.qty}
+                              {formatQtyValue(item.qty)}
                             </td>
                             <td className="px-4 py-1.5 text-right font-bold text-[#059669]">
                               {formatCurrency(item.value)}
@@ -226,7 +232,7 @@ const ProductWiseSalesReport = () => {
                             Subtotal
                           </td>
                           <td className="px-4 py-2 border-r border-[#E2E8F0] font-bold text-[#2563EB] text-right">
-                            {group.totalQty}
+                            {formatQtyValue(group.totalQty)}
                           </td>
                           <td className="px-4 py-2 font-bold text-[#2563EB] text-right">
                             {formatCurrency(group.totalValue)}
