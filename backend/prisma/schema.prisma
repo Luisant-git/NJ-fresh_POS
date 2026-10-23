@@ -548,7 +548,8 @@ model BankDeposit {
   date        DateTime @default(now())
   amount      Decimal
   depositType String   @default("BANK") // ATM MACHINE, BANK
-  
+  remarks     String?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

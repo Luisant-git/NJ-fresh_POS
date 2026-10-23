@@ -108,12 +108,14 @@ const BankDepositReport = () => {
                     const exportData = filteredDeposits.map((d: any) => ({
                       'Date': formatMalaysiaDate(d.date),
                       'Type': d.depositType,
-                      'Amount': d.amount
+                      'Amount': d.amount,
+                      'Remarks': d.remarks || ''
                     }));
                     exportData.push({
                       'Date': '',
                       'Type': 'TOTAL:',
-                      'Amount': formatCurrency(totalDepositAmount) as any
+                      'Amount': formatCurrency(totalDepositAmount) as any,
+                      'Remarks': ''
                     });
                     exportToExcel(exportData, `Bank_Deposit_Report_${fromDate}_to_${toDate}`, {
                       shopName: settings?.shopName || 'MY SHOP',
@@ -131,15 +133,18 @@ const BankDepositReport = () => {
                       { header: 'Date', dataKey: 'date' },
                       { header: 'Deposit Type', dataKey: 'depositType' },
                       { header: 'Amount', dataKey: 'amount' },
+                      { header: 'Remarks', dataKey: 'remarks' },
                     ];
                     const pdfData = [...filteredDeposits.map((d:any) => ({
                       ...d, 
                       date: formatMalaysiaDate(d.date),
-                      amount: formatCurrency(d.amount)
+                      amount: formatCurrency(d.amount),
+                      remarks: d.remarks || '-'
                     })), {
                       date: '',
                       depositType: 'TOTAL:',
-                      amount: formatCurrency(totalDepositAmount)
+                      amount: formatCurrency(totalDepositAmount),
+                      remarks: ''
                     }];
                     exportTableToPdf(cols, pdfData, `Bank_Deposit_Report_${fromDate}_to_${toDate}`, 'Bank Deposit Report', settings?.shopName, filteredDeposits.length);
                   }}
@@ -208,15 +213,16 @@ const BankDepositReport = () => {
                   <th className="px-4 py-3 border-r border-[#334155] font-bold uppercase tracking-wider text-[11px] text-center w-12">#</th>
                   <th className="px-4 py-3 border-r border-[#334155] font-bold uppercase tracking-wider text-[11px]">Date</th>
                   <th className="px-4 py-3 border-r border-[#334155] font-bold uppercase tracking-wider text-[11px]">Deposit Type</th>
-                  <th className="px-4 py-3 font-bold uppercase tracking-wider text-[11px] text-right">Amount</th>
+                  <th className="px-4 py-3 border-r border-[#334155] font-bold uppercase tracking-wider text-[11px] text-right">Amount</th>
+                  <th className="px-4 py-3 border-r border-[#334155] font-bold uppercase tracking-wider text-[11px]">Remarks</th>
                   <th className="px-4 py-3 font-bold uppercase tracking-wider text-[11px] text-center w-20">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
-                  <TableLoader columns={5} />
+                  <TableLoader columns={6} />
                 ) : filteredDeposits.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center p-6 text-black font-bold">No deposit records found.</td></tr>
+                  <tr><td colSpan={6} className="text-center p-6 text-black font-bold">No deposit records found.</td></tr>
                 ) : (
                   paginatedDeposits.map((d: any, index: number) => (
                     <tr key={d.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'} hover:bg-[#EFF6FF]`}>
@@ -228,6 +234,9 @@ const BankDepositReport = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-bold">{formatCurrency(d.amount)}</td>
+                      <td className="px-4 py-3 border-r border-[#E2E8F0] text-black max-w-[260px] truncate" title={d.remarks || ''}>
+                        {d.remarks || '-'}
+                      </td>
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => handleDelete(d.id)}

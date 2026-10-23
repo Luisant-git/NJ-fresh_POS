@@ -16,6 +16,7 @@ export class BankDepositsService {
         date: dateToSave,
         amount: createBankDepositDto.amount,
         depositType: createBankDepositDto.depositType,
+        remarks: createBankDepositDto.remarks?.trim?.() ? createBankDepositDto.remarks.trim() : null,
       },
     });
   }

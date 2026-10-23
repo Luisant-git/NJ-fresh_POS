@@ -24,6 +24,7 @@ const BankDepositEntry = () => {
   const [depositDate, setDepositDate] = useState(getMalaysiaDateStr());
   const [amount, setAmount] = useState('');
   const [depositType, setDepositType] = useState('BANK');
+  const [remarks, setRemarks] = useState('');
   
   // Date-wise Filter & Search State for History
   const [filterStartDate, setFilterStartDate] = useState(() => {
@@ -56,9 +57,11 @@ const BankDepositEntry = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bankDeposits'] });
+      queryClient.invalidateQueries({ queryKey: ['bankDepositReport'] });
       toast.success('Bank Deposit saved successfully!');
       setAmount('');
       setDepositType('BANK');
+      setRemarks('');
     },
     onError: (err: any) => {
       console.error(err);
@@ -74,7 +77,8 @@ const BankDepositEntry = () => {
     createMutation.mutate({
       date: depositDate,
       amount: Number(amount),
-      depositType: depositType
+      depositType: depositType,
+      remarks: remarks.trim() || undefined,
     });
   };
 
@@ -190,6 +194,17 @@ const BankDepositEntry = () => {
                 />
               </div>
             </div>
+
+            <div>
+              <label className="block text-[12px] font-bold text-gray-700 mb-1">Remarks <span className="text-gray-400 font-medium">(optional)</span></label>
+              <textarea
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                rows={3}
+                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white resize-none"
+                placeholder="Add notes for this deposit"
+              />
+            </div>
           </div>
           
           <div className="p-4 border-t border-gray-200 bg-gray-50">
@@ -258,15 +273,16 @@ const BankDepositEntry = () => {
                       <th className="p-2 font-bold uppercase tracking-wider text-[11px] border-r border-[#334155]">Date</th>
                       <th className="p-2 font-bold uppercase tracking-wider text-[11px] border-r border-[#334155]">Type</th>
                       <th className="p-2 font-bold uppercase tracking-wider text-[11px] border-r border-[#334155] text-right">Amount</th>
+                      <th className="p-2 font-bold uppercase tracking-wider text-[11px] border-r border-[#334155]">Remarks</th>
                       <th className="p-2 font-bold uppercase tracking-wider text-[11px] text-center w-20">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {historyLoading ? (
-                      <TableLoader columns={5} />
+                      <TableLoader columns={6} />
                     ) : filteredDeposits.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center p-8 text-gray-500 font-bold bg-gray-50/50">
+                        <td colSpan={6} className="text-center p-8 text-gray-500 font-bold bg-gray-50/50">
                           <div className="flex flex-col items-center justify-center">
                             <Briefcase className="w-8 h-8 text-gray-300 mb-2" />
                             No deposits found for selected criteria.
@@ -285,6 +301,9 @@ const BankDepositEntry = () => {
                           </td>
                           <td className="p-2 border-r border-gray-100 text-right text-black font-bold text-sm">
                             {formatCurrency(dep.amount)}
+                          </td>
+                          <td className="p-2 border-r border-gray-100 text-gray-700 max-w-[220px] truncate" title={dep.remarks || ''}>
+                            {dep.remarks || '-'}
                           </td>
                           <td className="p-2 text-center">
                             <button
