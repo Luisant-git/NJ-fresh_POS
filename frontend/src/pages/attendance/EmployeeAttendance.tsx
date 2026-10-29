@@ -193,7 +193,6 @@ export default function EmployeeAttendance() {
     : attendanceDraft?.checkInTime && durationEndTime
       ? getWorkedMinutes(attendanceDraft.checkInTime, durationEndTime)
       : null;
-  const autoStatus = workedMinutes === null ? null : getDurationStatus(workedMinutes);
   const durationRange = workedMinutes === null ? '' : workedMinutes >= 480 ? ' (8+ hrs)' : workedMinutes >= 240 ? ' (4-8 hrs)' : ' (< 4 hrs)';
 
   useEffect(() => {
@@ -220,28 +219,82 @@ export default function EmployeeAttendance() {
   const openAttendanceModal = (row: RosterRow) => {
     setClockNow(new Date());
     setSelectedEmployee(row);
+    const inTime = toInputTime(row.checkInTime) || (row.status === 'Not Marked' ? getCurrentTime() : '');
+    const outTime = toInputTime(row.checkOutTime);
+    let computedStatus: AttendanceStatus = row.status;
+    if (inTime && outTime) {
+      const worked = getWorkedMinutes(inTime, outTime);
+      if (worked !== null) computedStatus = getDurationStatus(worked);
+    } else if (!outTime) {
+      computedStatus = (row.status === 'Absent' || row.status === 'On Leave') && !inTime ? row.status : 'Not Marked';
+    }
     setAttendanceDraft({
-      checkInTime: toInputTime(row.checkInTime) || (row.status === 'Not Marked' ? getCurrentTime() : ''),
-      checkOutTime: toInputTime(row.checkOutTime),
-      status: row.status === 'Not Marked' ? 'Present' : row.status,
+      checkInTime: inTime,
+      checkOutTime: outTime,
+      status: computedStatus,
       remarks: row.remarks || '',
     });
   };
+
+  const handleCheckInChange = (newInTime: string) => {
+    setAttendanceDraft((draft) => {
+      if (!draft) return draft;
+      let nextStatus = draft.status;
+      if (newInTime && draft.checkOutTime) {
+        const worked = getWorkedMinutes(newInTime, draft.checkOutTime);
+        if (worked !== null) nextStatus = getDurationStatus(worked);
+      } else if (!draft.checkOutTime) {
+        nextStatus = (draft.status === 'Absent' || draft.status === 'On Leave') && !newInTime
+          ? draft.status
+          : 'Not Marked';
+      }
+      return { ...draft, checkInTime: newInTime, status: nextStatus };
+    });
+  };
+
+  const handleCheckOutChange = (newOutTime: string) => {
+    setAttendanceDraft((draft) => {
+      if (!draft) return draft;
+      let nextStatus = draft.status;
+      if (draft.checkInTime && newOutTime) {
+        const worked = getWorkedMinutes(draft.checkInTime, newOutTime);
+        if (worked !== null) nextStatus = getDurationStatus(worked);
+      } else if (!newOutTime) {
+        nextStatus = (draft.status === 'Absent' || draft.status === 'On Leave') && !draft.checkInTime
+          ? draft.status
+          : 'Not Marked';
+      }
+      return { ...draft, checkOutTime: newOutTime, status: nextStatus };
+    });
+  };
+
   const closeAttendanceModal = () => {
     if (!saveMutation.isPending) {
       setSelectedEmployee(null);
       setAttendanceDraft(null);
     }
   };
+
   const handleSaveAttendance = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedEmployee || !attendanceDraft) return;
+
+    let finalStatus = attendanceDraft.status;
+    if (attendanceDraft.checkInTime && attendanceDraft.checkOutTime) {
+      const worked = getWorkedMinutes(attendanceDraft.checkInTime, attendanceDraft.checkOutTime);
+      if (worked !== null) finalStatus = getDurationStatus(worked);
+    } else if (!attendanceDraft.checkOutTime) {
+      if (finalStatus === 'Present' || finalStatus === 'Half Day') {
+        finalStatus = 'Not Marked';
+      }
+    }
+
     saveMutation.mutate({
       employeeId: selectedEmployee.employeeId,
       date,
       ...(attendanceDraft.checkInTime ? { checkInTime: attendanceDraft.checkInTime } : {}),
       ...(attendanceDraft.checkOutTime ? { checkOutTime: attendanceDraft.checkOutTime } : {}),
-      status: attendanceDraft.status === 'Not Marked' ? 'Present' : attendanceDraft.status,
+      status: finalStatus,
       remarks: attendanceDraft.remarks.trim(),
     });
   };
@@ -500,14 +553,14 @@ export default function EmployeeAttendance() {
                   <TimeInput
                     label="Check-in time"
                     value={attendanceDraft.checkInTime}
-                    onChange={(value) => setAttendanceDraft((draft) => draft ? { ...draft, checkInTime: value } : draft)}
-                    onNow={() => setAttendanceDraft((draft) => draft ? { ...draft, checkInTime: getCurrentTime() } : draft)}
+                    onChange={handleCheckInChange}
+                    onNow={() => handleCheckInChange(getCurrentTime())}
                   />
                   <TimeInput
                     label="Check-out time"
                     value={attendanceDraft.checkOutTime}
-                    onChange={(value) => setAttendanceDraft((draft) => draft ? { ...draft, checkOutTime: value } : draft)}
-                    onNow={() => setAttendanceDraft((draft) => draft ? { ...draft, checkOutTime: getCurrentTime() } : draft)}
+                    onChange={handleCheckOutChange}
+                    onNow={() => handleCheckOutChange(getCurrentTime())}
                   />
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E1E7F0] bg-[#F7F9FC] px-3 py-2.5 text-xs">
@@ -516,27 +569,58 @@ export default function EmployeeAttendance() {
                   </p>
                   <span className={`rounded-md px-2.5 py-1 text-[11px] font-bold ${
                     !attendanceDraft.checkOutTime
-                      ? 'bg-[#E9EDF5] text-[#64748B]'
-                      : attendanceDraft.status === 'Absent' || attendanceDraft.status === 'On Leave'
-                        ? statusClass(attendanceDraft.status)
-                        : autoStatus === 'Present'
-                          ? statusClass('Present')
-                          : autoStatus === 'Half Day'
-                            ? statusClass('Half Day')
-                            : statusClass('Absent')
+                      ? 'border border-amber-200 bg-amber-50 text-amber-700'
+                      : statusClass(attendanceDraft.status)
                   }`}>
                     {!attendanceDraft.checkOutTime
-                      ? `Selected: ${attendanceDraft.status} · checkout needed`
-                      : attendanceDraft.status === 'Absent' || attendanceDraft.status === 'On Leave'
-                        ? `Selected: ${attendanceDraft.status}`
-                        : `Auto: ${autoStatus}${durationRange}`}
+                      ? 'Check-out time required to update status'
+                      : `Auto: ${attendanceDraft.status}${durationRange}`}
                   </span>
                 </div>
                 <label className="block text-sm font-bold text-black">
                   Attendance Status
-                  <select value={attendanceDraft.status} onChange={(event) => setAttendanceDraft((draft) => draft ? { ...draft, status: event.target.value as AttendanceStatus } : draft)} className="mt-1 block w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-normal text-black transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                  <select
+                    value={attendanceDraft.status}
+                    disabled={Boolean(attendanceDraft.checkInTime && !attendanceDraft.checkOutTime) || Boolean(attendanceDraft.checkInTime && attendanceDraft.checkOutTime)}
+                    onChange={(event) => {
+                      const newStatus = event.target.value as AttendanceStatus;
+                      if (!attendanceDraft.checkOutTime && (newStatus === 'Present' || newStatus === 'Half Day')) {
+                        toast.error('Check-out time is required to update attendance status to Present or Half Day');
+                        return;
+                      }
+                      setAttendanceDraft((draft) => draft ? { ...draft, status: newStatus } : draft);
+                    }}
+                    className={`mt-1 block w-full appearance-none rounded-xl border border-gray-200 px-4 py-2 text-sm font-normal text-black transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      attendanceDraft.checkInTime
+                        ? 'cursor-not-allowed bg-gray-100 text-gray-500'
+                        : 'bg-gray-50'
+                    }`}
+                  >
+                    {statuses.map((status) => (
+                      <option
+                        key={status}
+                        value={status}
+                        disabled={!attendanceDraft.checkOutTime && (status === 'Present' || status === 'Half Day')}
+                      >
+                        {status} {!attendanceDraft.checkOutTime && (status === 'Present' || status === 'Half Day') ? '(Requires Check-out)' : ''}
+                      </option>
+                    ))}
                   </select>
+                  {attendanceDraft.checkInTime && !attendanceDraft.checkOutTime && (
+                    <p className="mt-1 text-xs font-semibold text-amber-600">
+                      Check-out time is not entered. Status will not be updated until check-out time is provided.
+                    </p>
+                  )}
+                  {attendanceDraft.checkInTime && attendanceDraft.checkOutTime && (
+                    <p className="mt-1 text-xs font-semibold text-green-600">
+                      Attendance status is automatically updated based on working hours.
+                    </p>
+                  )}
+                  {!attendanceDraft.checkInTime && !attendanceDraft.checkOutTime && (
+                    <p className="mt-1 text-xs text-[#73879C]">
+                      Select Absent or On Leave for employees not on duty.
+                    </p>
+                  )}
                 </label>
                 <label className="block text-sm font-bold text-black">
                   Remarks / Duty Note <span className="font-normal text-[#73879C]">(Optional)</span>

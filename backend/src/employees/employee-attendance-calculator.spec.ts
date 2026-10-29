@@ -24,7 +24,9 @@ describe('calculateAttendanceStatus', () => {
     expect(calculateAttendanceStatus('09:00', '18:00', 'On Leave')).toBe('On Leave');
   });
 
-  it('keeps the selected status while one of the times is missing', () => {
-    expect(calculateAttendanceStatus('09:00', undefined, 'Present')).toBe('Present');
+  it('does not update status to Present or Half Day without checkout time', () => {
+    expect(calculateAttendanceStatus('09:00', undefined, 'Present')).toBe('Not Marked');
+    expect(calculateAttendanceStatus('09:00', '', 'Half Day')).toBe('Not Marked');
+    expect(calculateAttendanceStatus(undefined, undefined, 'Present')).toBe('Not Marked');
   });
 });

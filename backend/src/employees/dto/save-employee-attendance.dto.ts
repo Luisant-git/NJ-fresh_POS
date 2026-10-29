@@ -18,7 +18,7 @@ export class SaveEmployeeAttendanceDto {
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   checkOutTime?: string;
 
-  @IsIn(['Present', 'Absent', 'Half Day', 'On Leave'])
+  @IsIn(['Present', 'Absent', 'Half Day', 'On Leave', 'Not Marked'])
   status: string;
 
   @IsOptional()

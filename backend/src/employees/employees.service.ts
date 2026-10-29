@@ -3,10 +3,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { SaveEmployeeAttendanceDto } from './dto/save-employee-attendance.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
-import { calculateAttendanceStatus } from './employee-attendance-calculator';
+import { calculateAttendanceStatus, EmployeeAttendanceStatus } from './employee-attendance-calculator';
 
 const EMPLOYEE_STATUSES = ['Active', 'Inactive'];
-const ATTENDANCE_STATUSES = ['Present', 'Absent', 'Half Day', 'On Leave'];
+const ATTENDANCE_STATUSES = ['Present', 'Absent', 'Half Day', 'On Leave', 'Not Marked'];
 
 @Injectable()
 export class EmployeesService {
@@ -143,7 +143,7 @@ export class EmployeesService {
       throw new BadRequestException('Invalid attendance status');
     }
     const date = this.parseDate(dto.date);
-    const status = calculateAttendanceStatus(dto.checkInTime, dto.checkOutTime, dto.status as 'Present' | 'Absent' | 'Half Day' | 'On Leave');
+    const status = calculateAttendanceStatus(dto.checkInTime, dto.checkOutTime, dto.status as EmployeeAttendanceStatus);
     return this.prisma.employeeAttendance.upsert({
       where: { employeeId_date: { employeeId: dto.employeeId, date } },
       create: {
