@@ -12,6 +12,8 @@ import Brands from '../pages/master/Brands';
 import Categories from '../pages/master/Categories';
 import Suppliers from '../pages/master/Suppliers';
 import Customers from '../pages/master/Customers';
+import Employees from '../pages/master/Employees';
+import EmployeeAttendance from '../pages/attendance/EmployeeAttendance';
 import Units from '../pages/master/Units';
 import PaymentModes from '../pages/master/PaymentModes';
 import PaymentTypes from '../pages/master/PaymentTypes';
@@ -82,6 +84,8 @@ const AppRoutes = () => {
         <Route element={<ProtectedRoute requiredPerms="master_categories" />}><Route path="/master/categories" element={<Categories />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="master_suppliers" />}><Route path="/master/suppliers" element={<Suppliers />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="master_customers" />}><Route path="/master/customers" element={<Customers />} /></Route>
+        <Route element={<ProtectedRoute requiredPerms="master_employees" />}><Route path="/master/employees" element={<Employees />} /></Route>
+        <Route element={<ProtectedRoute requiredPerms="employee_attendance" />}><Route path="/employees/attendance" element={<EmployeeAttendance />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="master_units" />}><Route path="/master/units" element={<Units />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="master_payment_modes" />}><Route path="/master/payment-modes" element={<PaymentModes />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="master_payment_types" />}><Route path="/master/payment-types" element={<PaymentTypes />} /></Route>

@@ -25,6 +25,8 @@ const MODULES = [
       { id: 'master_units', name: 'Units' },
       { id: 'master_suppliers', name: 'Suppliers' },
       { id: 'master_customers', name: 'Customers' },
+      { id: 'master_employees', name: 'Employee' },
+      { id: 'employee_attendance', name: 'Employee Attendance' },
       { id: 'master_payment_modes', name: 'Payment Modes' },
       { id: 'master_payment_types', name: 'Payment Types' },
       { id: 'master_expense_categories', name: 'Expense Categories' },

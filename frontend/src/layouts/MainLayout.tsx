@@ -226,6 +226,8 @@ const MainLayout = () => {
                 <div className="my-1 border-t border-[#2A3F54]/30"></div>
                 {hasPerm('master_suppliers') && <MobileDropdownItem to="/master/suppliers" icon="fa-building-o" title="Suppliers" />}
                 {hasPerm('master_customers') && <MobileDropdownItem to="/master/customers" icon="fa-users" title="Customers" />}
+                {hasPerm('master_employees') && <MobileDropdownItem to="/master/employees" icon="fa-user" title="Employee" />}
+                {hasPerm('employee_attendance') && <MobileDropdownItem to="/employees/attendance" icon="fa-clock-o" title="Employee Attendance" />}
                 <div className="my-1 border-t border-[#2A3F54]/30"></div>
                 {hasPerm('master_payment_modes') && <MobileDropdownItem to="/master/payment-modes" icon="fa-credit-card-alt" title="Payment Modes" />}
                 {hasPerm('master_payment_types') && <MobileDropdownItem to="/master/payment-types" icon="fa-money" title="Payment Types" />}
@@ -318,7 +320,7 @@ const MainLayout = () => {
               <nav className="hidden lg:flex h-full items-center">
                 {hasPerm('dashboard_access') && <NavItem to="/dashboard" icon="fa-dashboard" title="Dashboard" />}
               
-            {hasAnyPerm(['master_products', 'master_brands', 'master_categories', 'master_units', 'master_suppliers', 'master_customers', 'master_payment_modes', 'master_payment_types', 'master_expense_categories']) && (
+            {hasAnyPerm(['master_products', 'master_brands', 'master_categories', 'master_units', 'master_suppliers', 'master_customers', 'master_employees', 'employee_attendance', 'master_payment_modes', 'master_payment_types', 'master_expense_categories']) && (
               <NavDropdown title="Master" icon="fa-database" isActive={isMasterActive}>
                 <div className="px-4 py-1.5 text-[11px] font-bold text-black font-bold uppercase tracking-wider">Inventory</div>
                 {hasPerm('master_products') && <DropdownItem to="/master/products" icon="fa-cubes" title="Products" />}
@@ -330,6 +332,8 @@ const MainLayout = () => {
                 <div className="px-4 py-1.5 text-[11px] font-bold text-black font-bold uppercase tracking-wider">People</div>
                 {hasPerm('master_suppliers') && <DropdownItem to="/master/suppliers" icon="fa-building-o" title="Suppliers" />}
                 {hasPerm('master_customers') && <DropdownItem to="/master/customers" icon="fa-users" title="Customers" />}
+                {hasPerm('master_employees') && <DropdownItem to="/master/employees" icon="fa-user" title="Employee" />}
+                {hasPerm('employee_attendance') && <DropdownItem to="/employees/attendance" icon="fa-clock-o" title="Employee Attendance" />}
                 
                 <div className="h-px bg-gray-100 my-1 mx-4"></div>
                 <div className="px-4 py-1.5 text-[11px] font-bold text-black font-bold uppercase tracking-wider">Settings</div>
@@ -498,7 +502,7 @@ const MainLayout = () => {
             <nav className="flex-1 py-2 overflow-y-auto custom-scrollbar">
               <MobileNavItem to="/dashboard" icon="fa-dashboard" title="Dashboard" onClick={closeMobileMenu} />
               
-              {hasAnyPerm(['master_products', 'master_brands', 'master_categories', 'master_units', 'master_suppliers', 'master_customers', 'master_payment_modes', 'master_payment_types', 'master_expense_categories']) && (
+              {hasAnyPerm(['master_products', 'master_brands', 'master_categories', 'master_units', 'master_suppliers', 'master_customers', 'master_employees', 'employee_attendance', 'master_payment_modes', 'master_payment_types', 'master_expense_categories']) && (
                 <MobileNavDropdown title="Master" icon="fa-database" isActive={isMasterActive}>
                   {hasPerm('master_products') && <MobileDropdownItem to="/master/products" icon="fa-cubes" title="Products" onClick={closeMobileMenu} />}
                   {hasPerm('master_brands') && <MobileDropdownItem to="/master/brands" icon="fa-tags" title="Brands" onClick={closeMobileMenu} />}
@@ -507,6 +511,8 @@ const MainLayout = () => {
                   <div className="my-1 border-t border-[#2A3F54]/30"></div>
                   {hasPerm('master_suppliers') && <MobileDropdownItem to="/master/suppliers" icon="fa-building-o" title="Suppliers" onClick={closeMobileMenu} />}
                   {hasPerm('master_customers') && <MobileDropdownItem to="/master/customers" icon="fa-users" title="Customers" onClick={closeMobileMenu} />}
+                  {hasPerm('master_employees') && <MobileDropdownItem to="/master/employees" icon="fa-user" title="Employee" onClick={closeMobileMenu} />}
+                  {hasPerm('employee_attendance') && <MobileDropdownItem to="/employees/attendance" icon="fa-clock-o" title="Employee Attendance" onClick={closeMobileMenu} />}
                   <div className="my-1 border-t border-[#2A3F54]/30"></div>
                   {hasPerm('master_payment_modes') && <MobileDropdownItem to="/master/payment-modes" icon="fa-credit-card-alt" title="Payment Modes" onClick={closeMobileMenu} />}
                   {hasPerm('master_payment_types') && <MobileDropdownItem to="/master/payment-types" icon="fa-money" title="Payment Types" onClick={closeMobileMenu} />}

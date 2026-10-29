@@ -119,6 +119,34 @@ model Customer {
   updatedAt          DateTime @updatedAt
 }
 
+model Employee {
+  id              Int                  @id @default(autoincrement())
+  employeeCode    String               @unique
+  name            String
+  role            String
+  phone           String?
+  status          String               @default("Active")
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  attendance      EmployeeAttendance[]
+}
+
+model EmployeeAttendance {
+  id           Int      @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  date         DateTime @db.Date
+  checkInTime  String?
+  checkOutTime String?
+  status       String   @default("Present")
+  remarks      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([date])
+}
+
 model PaymentMode {
   id          Int        @id @default(autoincrement())
   name        String     @unique // e.g., Cash, UPI, Credit Card
