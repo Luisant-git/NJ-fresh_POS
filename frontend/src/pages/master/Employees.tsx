@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle, Clock3, Edit, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
+import { CheckCircle, Clock3, Edit, Search, Trash2, UserRound, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
@@ -124,12 +124,9 @@ export default function Employees() {
           <p className="mt-1 text-sm text-[#73879C]">Maintain employee codes, contact details, roles and work status.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link to="/employees/attendance" className="inline-flex items-center gap-2 rounded border border-[#3B82F6] bg-white px-4 py-2 text-sm font-bold text-[#3B82F6] shadow-sm transition-colors hover:bg-[#3B82F6] hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <Link to="/employees/attendance" className="inline-flex items-center gap-2 rounded bg-[#3B82F6] px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#2563EB] focus:outline-none focus:ring-2 focus:ring-blue-300">
             <Clock3 size={16} /> Employee Attendance
           </Link>
-          <button type="button" onClick={startNew} className="inline-flex items-center gap-2 bg-[#3B82F6] px-4 py-2 text-sm font-bold text-white hover:bg-[#2563EB] focus:outline-none focus:ring-2 focus:ring-blue-300">
-            <Plus size={16} /> New Employee
-          </button>
         </div>
       </header>
 
