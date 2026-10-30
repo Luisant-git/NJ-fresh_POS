@@ -97,4 +97,21 @@ describe('EmployeesService', () => {
       create: expect.objectContaining({ checkInTime: '08:30', checkOutTime: '17:00', remarks: 'On time' }),
     }));
   });
+
+  it('generates the next sequential employee code', async () => {
+    prisma.employee.findMany.mockResolvedValue([
+      { employeeCode: 'EMP-001' },
+      { employeeCode: 'EMP-005' },
+    ]);
+
+    const result = await service.getNextCode();
+    expect(result).toEqual({ nextCode: 'EMP-006', code: 'EMP-006' });
+  });
+
+  it('generates EMP-001 when no existing employee codes are present', async () => {
+    prisma.employee.findMany.mockResolvedValue([]);
+
+    const result = await service.getNextCode();
+    expect(result).toEqual({ nextCode: 'EMP-001', code: 'EMP-001' });
+  });
 });

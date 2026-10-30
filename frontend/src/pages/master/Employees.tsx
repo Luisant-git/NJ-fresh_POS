@@ -34,7 +34,10 @@ export default function Employees() {
   });
   const nextCodeQuery = useQuery({
     queryKey: ['employee-next-code'],
-    queryFn: async () => (await api.get<{ nextCode: string }>('/employees/next-code')).data.nextCode,
+    queryFn: async () => {
+      const res = await api.get<{ nextCode?: string; code?: string }>('/employees/next-code');
+      return res.data.nextCode || res.data.code || '';
+    },
   });
 
   const saveMutation = useMutation({
@@ -59,11 +62,18 @@ export default function Employees() {
 
   const startNew = async () => {
     setEditingId(null);
-    const result = await queryClient.fetchQuery({
-      queryKey: ['employee-next-code'],
-      queryFn: async () => (await api.get<{ nextCode: string }>('/employees/next-code')).data.nextCode,
-    });
-    setForm({ ...blankForm, employeeCode: result });
+    try {
+      const result = await queryClient.fetchQuery({
+        queryKey: ['employee-next-code'],
+        queryFn: async () => {
+          const res = await api.get<{ nextCode?: string; code?: string }>('/employees/next-code');
+          return res.data.nextCode || res.data.code || '';
+        },
+      });
+      setForm({ ...blankForm, employeeCode: result || '' });
+    } catch {
+      setForm(blankForm);
+    }
   };
 
   const editEmployee = (employee: Employee) => {

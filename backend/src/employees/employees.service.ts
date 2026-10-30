@@ -23,13 +23,14 @@ export class EmployeesService {
     return parsed;
   }
 
-  async getNextCode(): Promise<{ nextCode: string }> {
+  async getNextCode(): Promise<{ nextCode: string; code: string }> {
     const codes = await this.prisma.employee.findMany({ select: { employeeCode: true } });
     const max = codes.reduce((current, employee) => {
       const match = /^EMP-(\d+)$/.exec(employee.employeeCode);
       return match ? Math.max(current, Number(match[1])) : current;
     }, 0);
-    return { nextCode: `EMP-${String(max + 1).padStart(3, '0')}` };
+    const nextCode = `EMP-${String(max + 1).padStart(3, '0')}`;
+    return { nextCode, code: nextCode };
   }
 
   findAll(query: { search?: string; status?: string } = {}) {
