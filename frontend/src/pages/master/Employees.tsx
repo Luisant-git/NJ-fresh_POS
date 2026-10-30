@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle, Clock3, Edit, Plus, Search, UserRound, X } from 'lucide-react';
+import { CheckCircle, Clock3, Edit, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 
 type Employee = {
   id: number;
@@ -23,6 +24,7 @@ export default function Employees() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<EmployeeForm>(blankForm);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<Employee | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -52,6 +54,21 @@ export default function Employees() {
       setForm(blankForm);
     },
     onError: (error: any) => toast.error(error.response?.data?.message || 'Unable to save employee'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/employees/${id}`),
+    onSuccess: () => {
+      toast.success('Employee deleted');
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-next-code'] });
+      setItemToDelete(null);
+      if (itemToDelete && editingId === itemToDelete.id) {
+        setEditingId(null);
+        setForm(blankForm);
+      }
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Unable to delete employee'),
   });
 
   useEffect(() => {
@@ -203,9 +220,14 @@ export default function Employees() {
                         </span>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <button aria-label={`Edit ${employee.name}`} onClick={() => editEmployee(employee)} className="rounded border border-[#3B82F6] p-1 text-[#3B82F6] transition-colors hover:bg-[#3B82F6] hover:text-white">
-                          <Edit size={12} />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button type="button" aria-label={`Edit ${employee.name}`} onClick={() => editEmployee(employee)} className="rounded border border-[#3B82F6] p-1 text-[#3B82F6] transition-colors hover:bg-[#3B82F6] hover:text-white" title="Edit Employee">
+                            <Edit size={12} />
+                          </button>
+                          <button type="button" aria-label={`Delete ${employee.name}`} onClick={() => setItemToDelete(employee)} className="rounded border border-[#EF4444] p-1 text-[#EF4444] transition-colors hover:bg-[#EF4444] hover:text-white" title="Delete Employee">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -215,6 +237,18 @@ export default function Employees() {
           )}
         </section>
       </div>
+
+      <DeleteConfirmationModal
+        isOpen={!!itemToDelete}
+        itemName={itemToDelete ? `${itemToDelete.name} (${itemToDelete.employeeCode})` : undefined}
+        isDeleting={deleteMutation.isPending}
+        onConfirm={() => {
+          if (itemToDelete) {
+            deleteMutation.mutate(itemToDelete.id);
+          }
+        }}
+        onCancel={() => setItemToDelete(null)}
+      />
     </main>
   );
 }
