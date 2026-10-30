@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import { getMalaysiaDateStr } from '../../utils/date';
 
 type AttendanceStatus = 'Present' | 'Absent' | 'Half Day' | 'On Leave' | 'Not Marked';
 type RosterRow = {
@@ -58,13 +59,14 @@ type AttendancePayload = Omit<AttendanceDraft, 'checkInTime' | 'checkOutTime'> &
 const fieldClass = 'h-10 rounded-sm border border-[#CCC] bg-white px-3 text-sm font-bold text-black shadow-inner outline-none transition focus:border-[#3B82F6] focus:bg-[#EBF5FF] focus:ring-0';
 const statuses: AttendanceStatus[] = ['Present', 'Absent', 'Half Day', 'On Leave', 'Not Marked'];
 const pageSizes = [10, 25, 50, 100, 99999];
-const localDateString = (date = new Date()) => {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-};
+const malaysiaDateString = (date = new Date()) => getMalaysiaDateStr(date);
 const formatDate = (date: string) => new Date(`${date.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC' });
-const getCurrentTime = (now = new Date()) => {
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-};
+const getCurrentTime = (now = new Date()) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kuala_Lumpur',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+}).format(now);
 const formatTime12Hour = (value: string | null | undefined) => {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value || '');
   if (!match) return value || '--:--';
@@ -123,7 +125,7 @@ const statusClass = (status: string) => {
 export default function EmployeeAttendance() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'daily' | 'history'>('daily');
-  const [date, setDate] = useState(localDateString);
+  const [date, setDate] = useState(malaysiaDateString);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<AttendanceStatus | 'ALL'>('ALL');
   const [page, setPage] = useState(1);
@@ -184,7 +186,7 @@ export default function EmployeeAttendance() {
     const start = (page - 1) * pageSize;
     return filteredRoster.slice(start, start + pageSize);
   }, [filteredRoster, page, pageSize]);
-  const isWorkingInProgress = Boolean(selectedEmployee && attendanceDraft && !attendanceDraft.checkOutTime && date === localDateString(clockNow));
+  const isWorkingInProgress = Boolean(selectedEmployee && attendanceDraft && !attendanceDraft.checkOutTime && date === malaysiaDateString(clockNow));
   const durationEndTime = attendanceDraft?.checkOutTime || (isWorkingInProgress ? getCurrentTime(clockNow) : '');
   const startMinutes = attendanceDraft?.checkInTime ? getMinutesFromTime(attendanceDraft.checkInTime) : null;
   const endMinutes = durationEndTime ? getMinutesFromTime(durationEndTime) : null;
@@ -329,7 +331,7 @@ export default function EmployeeAttendance() {
           </Link>
           <div className="inline-flex h-10 items-center gap-2 rounded-sm border border-[#E5E7EB] bg-white px-3 text-sm font-bold text-black shadow-sm">
             <CalendarDays size={16} className="text-[#3B82F6]" />
-            {date === localDateString() ? "Today's roster" : formatDate(date)}
+            {date === malaysiaDateString() ? "Today's roster" : formatDate(date)}
           </div>
         </div>
       </header>
