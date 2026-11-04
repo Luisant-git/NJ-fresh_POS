@@ -8,11 +8,13 @@ describe('EmployeesService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
     employeeAttendance: {
       findMany: jest.fn(),
       upsert: jest.fn(),
       count: jest.fn(),
+      deleteMany: jest.fn(),
     },
   };
   let service: EmployeesService;
@@ -113,5 +115,16 @@ describe('EmployeesService', () => {
 
     const result = await service.getNextCode();
     expect(result).toEqual({ nextCode: 'EMP-001', code: 'EMP-001' });
+  });
+
+  it('removes an employee and their attendance records', async () => {
+    prisma.employee.findUnique.mockResolvedValue({ id: 5, name: 'Sam' });
+    prisma.employeeAttendance.deleteMany.mockResolvedValue({ count: 2 });
+    prisma.employee.delete.mockResolvedValue({ id: 5 });
+
+    const result = await service.remove(5);
+    expect(prisma.employeeAttendance.deleteMany).toHaveBeenCalledWith({ where: { employeeId: 5 } });
+    expect(prisma.employee.delete).toHaveBeenCalledWith({ where: { id: 5 } });
+    expect(result).toEqual({ id: 5 });
   });
 });

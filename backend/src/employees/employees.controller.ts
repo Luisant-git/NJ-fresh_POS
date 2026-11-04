@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UsePipes, ValidationPipe } from '@nestjs/common';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { SaveEmployeeAttendanceDto } from './dto/save-employee-attendance.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
@@ -61,5 +61,10 @@ export class EmployeesController {
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateEmployeeDto) {
     return this.employeesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.employeesService.remove(id);
   }
 }

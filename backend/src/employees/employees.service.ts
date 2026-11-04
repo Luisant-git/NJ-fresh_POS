@@ -109,6 +109,12 @@ export class EmployeesService {
     });
   }
 
+  async remove(id: number) {
+    await this.findOne(id);
+    await this.prisma.employeeAttendance.deleteMany({ where: { employeeId: id } });
+    return this.prisma.employee.delete({ where: { id } });
+  }
+
   async getAttendanceRoster(dateString?: string) {
     const date = this.parseDate(dateString ?? new Date().toISOString().slice(0, 10));
     const dateStr = date.toISOString().slice(0, 10);
