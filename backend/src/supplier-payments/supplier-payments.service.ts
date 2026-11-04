@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -85,6 +85,9 @@ export class SupplierPaymentsService {
         supplier: true,
         paymentType: true,
         paymentMode: true,
+        allocations: {
+          include: { purchase: true }
+        },
       },
     });
   }
