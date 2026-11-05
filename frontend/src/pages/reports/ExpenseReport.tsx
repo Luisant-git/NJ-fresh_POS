@@ -9,20 +9,25 @@ import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
 import PaginationControls from '../../components/PaginationControls';
 import TableLoader from '../../components/TableLoader';
+import SearchableSelect from '../../components/SearchableSelect';
 
 const ExpenseReport = () => {
   const { formatCurrency, settings } = useSettings();
 
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return getMalaysiaDateStr(d);
-  });
-  const [endDate, setEndDate] = useState(() => getMalaysiaDateStr());
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [entriesPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['expenseCategories'],
+    queryFn: async () => {
+      const { data } = await api.get('/expense-categories');
+      return data;
+    }
+  });
 
   const { data: expenses = [], isLoading, refetch } = useQuery({
     queryKey: ['expensesReport', startDate, endDate, categoryId, searchQuery],
@@ -61,6 +66,15 @@ const ExpenseReport = () => {
       setStartDate('');
       setEndDate('');
     }
+    setCurrentPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setCategoryId('');
+    setSearchQuery('');
+    setCurrentPage(1);
   };
 
   const handlePdfExport = () => {
@@ -101,42 +115,90 @@ const ExpenseReport = () => {
     <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col font-sans overflow-y-auto lg:overflow-hidden z-10 p-2 sm:p-4">
       <ReportTabs />
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center pt-2 border-t border-dashed border-[#E2E8F0] gap-3 md:gap-0">
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <button type="button" onClick={() => refetch()} className="bg-[#0F172A] hover:bg-[#1E293B] text-white px-4 py-1.5 rounded-md flex items-center gap-2 text-[13px] font-bold transition-colors">
-              <Filter size={14} /> Apply Filter
-            </button>
-            <button type="button" onClick={() => setQuickDate('today')} className="bg-gray-100 hover:bg-gray-200 text-black font-bold text-[12px] px-3 py-1.5 rounded transition-colors">Today</button>
-            <button type="button" onClick={() => setQuickDate('thisMonth')} className="bg-gray-100 hover:bg-gray-200 text-black font-bold text-[12px] px-3 py-1.5 rounded transition-colors">This Month</button>
-            <button type="button" onClick={() => { setEndDate(''); setCategoryId(''); setSearchQuery(''); }} className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-[12px] font-bold transition-colors shadow-sm border ${!isReset ? 'bg-white text-red-600 border-red-200 hover:bg-red-50' : 'bg-white text-black border-[#CBD5E1] hover:bg-gray-100'}`}>
-              <RefreshCw size={12} /> Reset Filters
+      {/* Filter Toolbar */}
+      <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md p-3 mb-2 flex flex-col gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 min-w-[130px] flex-1 sm:flex-none">
+            <span className="text-[12px] text-black font-bold shrink-0">From:</span>
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+              className="border border-[#CBD5E1] rounded px-2 py-1 text-[12px] font-bold w-full bg-white outline-none focus:border-[#3B82F6]"
+            />
+          </div>
+          <div className="flex items-center gap-1 min-w-[130px] flex-1 sm:flex-none">
+            <span className="text-[12px] text-black font-bold shrink-0">To:</span>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+              className="border border-[#CBD5E1] rounded px-2 py-1 text-[12px] font-bold w-full bg-white outline-none focus:border-[#3B82F6]"
+            />
+          </div>
+          <div className="min-w-[160px] flex-1 sm:flex-none">
+            <SearchableSelect
+              options={[{ value: '', label: 'All Categories' }, ...categories.map((c: any) => ({ value: c.id.toString(), label: c.name }))]}
+              value={categoryId}
+              onChange={(val) => { setCategoryId(val || ''); setCurrentPage(1); }}
+              placeholder="All Categories"
+            />
+          </div>
+          <button 
+            type="button" 
+            onClick={() => refetch()} 
+            className="bg-[#0F172A] hover:bg-[#1E293B] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors shadow-sm"
+          >
+            <Filter size={14} /> Apply Filter
+          </button>
+        </div>
+
+        {/* Row 2: Presets, Reset, Totals */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button type="button" onClick={() => setQuickDate('today')} className="bg-gray-100 hover:bg-gray-200 text-black font-bold text-[11px] px-2.5 py-1 rounded transition-colors">Today</button>
+            <button type="button" onClick={() => setQuickDate('thisMonth')} className="bg-gray-100 hover:bg-gray-200 text-black font-bold text-[11px] px-2.5 py-1 rounded transition-colors">This Month</button>
+            <button type="button" onClick={() => setQuickDate('all')} className="bg-gray-100 hover:bg-gray-200 text-black font-bold text-[11px] px-2.5 py-1 rounded transition-colors">All Time</button>
+            <button 
+              type="button" 
+              onClick={handleResetFilters} 
+              className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold transition-colors shadow-sm border ${!isReset ? 'bg-white text-red-600 border-red-200 hover:bg-red-50' : 'bg-white text-black border-[#CBD5E1] hover:bg-gray-100'}`}
+            >
+              <RefreshCw size={11} /> Reset Filters
             </button>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 text-xs font-bold text-black">
+          <div className="flex items-center gap-3 text-xs font-bold text-black ml-auto">
             <span>Total Entries: <strong className="text-[#0F172A]">{totalEntries}</strong></span>
             <span>Total Expense: <strong className="text-[#EF4444]">{formatCurrency(totalExpenseAmount)}</strong></span>
           </div>
         </div>
+      </div>
 
       {/* Report Table Section */}
-      <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md overflow-hidden flex flex-col flex-1">
-        <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-3 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-0 shrink-0">
+      <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-3 py-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-0 shrink-0">
           <div className="flex items-center gap-2 text-black font-bold">
             <FileText size={16} />
             <h2 className="font-bold text-[13px] tracking-wide text-black">EXPENSE TRANSACTIONS REPORT</h2>
           </div>
-                      <div className="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-              <div className="relative flex-1 min-w-[120px]">
-                <Search size={14} className="absolute left-2.5 top-2.5 text-black font-bold" />
-                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Quick search..." className="w-full pl-8 pr-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[12px] md:w-48 focus:border-[#3B82F6]" />
-              </div>
-              <button type="button" onClick={handleExcelExport} className="shrink-0 bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center justify-center gap-1.5 text-[12px] font-bold whitespace-nowrap transition-colors">
-                <Download size={14} /> <span className="hidden lg:inline">Export Excel</span>
-              </button>
-              <button type="button" onClick={handlePdfExport} className="shrink-0 bg-[#EF4444] hover:bg-[#DC2626] text-white px-3 py-1.5 rounded flex items-center justify-center gap-1.5 text-[12px] font-bold whitespace-nowrap transition-colors">
-                <Download size={14} /> <span className="hidden lg:inline">Export PDF</span>
-              </button>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="relative flex-1 min-w-[120px]">
+              <Search size={14} className="absolute left-2.5 top-2.5 text-black font-bold" />
+              <input 
+                type="text" 
+                value={searchQuery} 
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }} 
+                placeholder="Quick search..." 
+                className="w-full pl-8 pr-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[12px] md:w-48 focus:border-[#3B82F6]" 
+              />
             </div>
+            <button type="button" onClick={handleExcelExport} className="shrink-0 bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center justify-center gap-1.5 text-[12px] font-bold whitespace-nowrap transition-colors">
+              <Download size={14} /> <span className="hidden lg:inline">Export Excel</span>
+            </button>
+            <button type="button" onClick={handlePdfExport} className="shrink-0 bg-[#EF4444] hover:bg-[#DC2626] text-white px-3 py-1.5 rounded flex items-center justify-center gap-1.5 text-[12px] font-bold whitespace-nowrap transition-colors">
+              <Download size={14} /> <span className="hidden lg:inline">Export PDF</span>
+            </button>
+          </div>
         </div>
 
         <div id="expense-report-export" className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -206,4 +268,3 @@ const ExpenseReport = () => {
 };
 
 export default ExpenseReport;
-
