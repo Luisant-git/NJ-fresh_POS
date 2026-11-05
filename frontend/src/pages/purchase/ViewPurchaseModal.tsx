@@ -18,7 +18,7 @@ export default function ViewPurchaseModal({ purchaseId, onClose }: Props) {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-10">
+      <div className="fixed inset-x-0 bottom-0 top-[60px] z-50 flex items-start justify-center bg-black/50 pt-10">
         <div className="bg-white p-6 rounded-md shadow-lg font-bold text-[#1E3A8A]">Loading invoice details...</div>
       </div>
     );
@@ -27,8 +27,8 @@ export default function ViewPurchaseModal({ purchaseId, onClose }: Props) {
   if (!purchase) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/60 flex items-start justify-center overflow-y-auto md:p-6">
-      <div className="bg-white w-full max-w-4xl shadow-2xl flex flex-col md:rounded-md md:max-h-[92vh] animate-sheet-down">
+    <div className="fixed inset-x-0 bottom-0 top-[60px] z-[9999] bg-black/60 flex items-start justify-center overflow-y-auto md:px-6 md:pb-6 md:pt-4">
+      <div className="bg-white w-full max-w-4xl shadow-2xl flex flex-col md:rounded-md md:max-h-[calc(100vh-60px-1.5rem)] animate-sheet-down">
 
         {/* Header */}
         <div className="sticky top-0 z-10 bg-[#3B82F6] text-white px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between gap-2 shrink-0">

@@ -24,7 +24,7 @@ export default function ViewSalesModal({ saleId, onClose }: Props) {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="fixed inset-x-0 bottom-0 top-[60px] z-50 flex items-start justify-center bg-black/50 pt-10">
         <div className="bg-white p-6 rounded-md shadow-lg font-bold text-[#1E3A8A]">Loading invoice details...</div>
       </div>
     );
@@ -33,8 +33,8 @@ export default function ViewSalesModal({ saleId, onClose }: Props) {
   if (!sale) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
-      <div className="bg-white w-full max-w-5xl rounded-md shadow-lg overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+    <div className="fixed inset-x-0 bottom-0 top-[60px] z-[9999] bg-black/50 flex items-start justify-center overflow-y-auto p-2 sm:p-4">
+      <div className="bg-white w-full max-w-5xl shadow-lg flex flex-col max-h-[calc(100vh-60px-1rem)] overflow-hidden animate-sheet-down sm:rounded-md">
         
         {/* Header */}
         <div className="bg-[#3B82F6] text-white px-3 sm:px-4 py-2 sm:py-3 flex items-start sm:items-center justify-between shrink-0 gap-2">
