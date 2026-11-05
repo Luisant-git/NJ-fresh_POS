@@ -93,7 +93,11 @@ const CustomerReceipts = () => {
     const fetchBalance = async () => {
       if (selectedCustomerId && selectedCustomerId > 0) {
         try {
-          const res = await api.get(`/customer-receipts/balance/${selectedCustomerId}`);
+          let balUrl = `/customer-receipts/balance/${selectedCustomerId}`;
+          if (editingId) {
+            balUrl += `?excludeReceiptId=${editingId}`;
+          }
+          const res = await api.get(balUrl);
           setCurrentBalance(res.data.balance);
           
           let url = `/customer-receipts/unpaid-bills/${selectedCustomerId}`;
@@ -151,6 +155,13 @@ const CustomerReceipts = () => {
   });
 
   const onSubmit = (data: ReceiptFormValues) => {
+    const totalAlloc = Object.values(allocations).reduce((sum, curr) => sum + (Number(curr) || 0), 0);
+    const enteredAmount = Number(data.amount) || 0;
+    if (totalAlloc > enteredAmount + 0.009) {
+      toast.error(`Total allocated amount (${formatCurrency(totalAlloc)}) cannot exceed collection amount (${formatCurrency(enteredAmount)})`);
+      return;
+    }
+
     const payload = {
       ...data,
       allocations: Object.entries(allocations).map(([saleId, amount]) => ({
@@ -740,18 +751,32 @@ const CustomerReceipts = () => {
                           <td rowSpan={rowSpan} className="px-3 py-2 text-right font-bold text-black border-r border-[#E2E8F0] align-top">{formatCurrency(openCr > 0 ? openCr : 0)}</td>
                           
                           {r.allocations && r.allocations.length > 0 ? (
-                            <>
-                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-black font-bold">{r.allocations[0].sale?.invoiceNo || '-'}</td>
-                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-black">{r.allocations[0].sale?.date ? getMalaysiaDateStr(r.allocations[0].sale.date) : '-'}</td>
-                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-center text-black">
-                                {r.allocations[0].sale?.date ? Math.floor((new Date(r.date).getTime() - new Date(r.allocations[0].sale.date).getTime()) / (1000 * 3600 * 24)) : '-'}
-                              </td>
-                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-right text-black">{formatCurrency(r.allocations[0].sale?.grandTotal || 0)}</td>
-                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-right font-bold text-[#059669]">{formatCurrency(r.allocations[0].amount)}</td>
-                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-right text-black">
-                                {formatCurrency((r.allocations[0].sale?.grandTotal || 0) - r.allocations[0].amount)}
-                              </td>
-                            </>
+                            (() => {
+                              const a = r.allocations[0];
+                              const isOB = !a.saleId;
+                              const invNo = isOB ? 'Opening Balance' : (a.sale?.invoiceNo || '-');
+                              const rawDate = isOB ? r.customer?.createdAt : a.sale?.date;
+                              const invDate = rawDate ? getMalaysiaDateStr(rawDate) : '-';
+                              const days = rawDate ? Math.max(0, Math.floor((new Date(r.date).getTime() - new Date(rawDate).getTime()) / (1000 * 3600 * 24))) : '-';
+                              const origAmt = isOB ? Number(r.customer?.openingBalance || a.amount) : Number(a.sale?.grandTotal || 0);
+                              const amtPaid = Number(a.amount || 0);
+                              const outstanding = Math.max(0, origAmt - amtPaid);
+
+                              return (
+                                <>
+                                  <td className="px-3 py-2 border-r border-[#E2E8F0] text-black font-bold">{invNo}</td>
+                                  <td className="px-3 py-2 border-r border-[#E2E8F0] text-black">{invDate}</td>
+                                  <td className="px-3 py-2 border-r border-[#E2E8F0] text-center text-black">
+                                    {days}
+                                  </td>
+                                  <td className="px-3 py-2 border-r border-[#E2E8F0] text-right text-black">{formatCurrency(origAmt)}</td>
+                                  <td className="px-3 py-2 border-r border-[#E2E8F0] text-right font-bold text-[#059669]">{formatCurrency(amtPaid)}</td>
+                                  <td className="px-3 py-2 border-r border-[#E2E8F0] text-right text-black">
+                                    {formatCurrency(outstanding)}
+                                  </td>
+                                </>
+                              );
+                            })()
                           ) : (
                             <>
                               <td className="px-3 py-2 border-r border-[#E2E8F0] text-black text-center">-</td>
@@ -786,6 +811,7 @@ const CustomerReceipts = () => {
                                     });
                                   }
                                   setAllocations(existingAllocs);
+                                  setShowBreakdown(true);
                                   window.scrollTo({ top: 0, behavior: 'smooth' });
                                 }}
                                 className="bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] px-2 py-1 rounded text-[11px] font-bold border border-[#BFDBFE] transition-colors"
@@ -796,20 +822,31 @@ const CustomerReceipts = () => {
                           )}
                         </tr>
                         
-                        {r.allocations && r.allocations.slice(1).map((a: any, i: number) => (
-                          <tr key={i} className={`border-b ${i === r.allocations.length - 2 ? 'border-[#E2E8F0]' : 'border-dashed border-[#CBD5E1]'} ${idx % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'}`}>
-                            <td className="px-3 py-2 border-r border-[#E2E8F0] text-black font-bold">{a.sale?.invoiceNo || '-'}</td>
-                            <td className="px-3 py-2 border-r border-[#E2E8F0] text-black">{a.sale?.date ? getMalaysiaDateStr(a.sale.date) : '-'}</td>
-                            <td className="px-3 py-2 border-r border-[#E2E8F0] text-center text-black">
-                              {a.sale?.date ? Math.floor((new Date(r.date).getTime() - new Date(a.sale.date).getTime()) / (1000 * 3600 * 24)) : '-'}
-                            </td>
-                            <td className="px-3 py-2 border-r border-[#E2E8F0] text-right text-black">{formatCurrency(a.sale?.grandTotal || 0)}</td>
-                            <td className="px-3 py-2 border-r border-[#E2E8F0] text-right font-bold text-[#059669]">{formatCurrency(a.amount)}</td>
-                            <td className="px-3 py-2 border-r border-[#E2E8F0] text-right text-black">
-                              {formatCurrency((a.sale?.grandTotal || 0) - a.amount)}
-                            </td>
-                          </tr>
-                        ))}
+                        {r.allocations && r.allocations.slice(1).map((a: any, i: number) => {
+                          const isOB = !a.saleId;
+                          const invNo = isOB ? 'Opening Balance' : (a.sale?.invoiceNo || '-');
+                          const rawDate = isOB ? r.customer?.createdAt : a.sale?.date;
+                          const invDate = rawDate ? getMalaysiaDateStr(rawDate) : '-';
+                          const days = rawDate ? Math.max(0, Math.floor((new Date(r.date).getTime() - new Date(rawDate).getTime()) / (1000 * 3600 * 24))) : '-';
+                          const origAmt = isOB ? Number(r.customer?.openingBalance || a.amount) : Number(a.sale?.grandTotal || 0);
+                          const amtPaid = Number(a.amount || 0);
+                          const outstanding = Math.max(0, origAmt - amtPaid);
+
+                          return (
+                            <tr key={i} className={`border-b ${i === r.allocations.length - 2 ? 'border-[#E2E8F0]' : 'border-dashed border-[#CBD5E1]'} ${idx % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'}`}>
+                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-black font-bold">{invNo}</td>
+                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-black">{invDate}</td>
+                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-center text-black">
+                                {days}
+                              </td>
+                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-right text-black">{formatCurrency(origAmt)}</td>
+                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-right font-bold text-[#059669]">{formatCurrency(amtPaid)}</td>
+                              <td className="px-3 py-2 border-r border-[#E2E8F0] text-right text-black">
+                                {formatCurrency(outstanding)}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </React.Fragment>
                     );
                   })

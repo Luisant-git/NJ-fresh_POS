@@ -33,8 +33,31 @@ export class ReportsService {
 
     const netOperatingRevenue = grossSales - totalSalesReturns;
 
-    // --- COGS CALCULATION: PURCHASES ONLY ---
+    // --- COGS CALCULATION: OPENING STOCK + PURCHASES - PURCHASE RETURNS - CLOSING STOCK ---
     
+    // Get all products and their current purchase rate to value stock
+    const allProducts = await this.prisma.product.findMany({
+      select: { id: true, purchaseRate: true }
+    });
+    const productRates = Object.fromEntries(allProducts.map(p => [p.id, Number(p.purchaseRate || 0)]));
+
+    // A. Opening Stock Value (Stock balance before fromDate)
+    let openingStockValue = 0;
+    if (fromDateStr) {
+      const fromDate = new Date(`${fromDateStr}T00:00:00+08:00`);
+      const openingTxs = await this.prisma.stockTransaction.groupBy({
+        by: ['productId'],
+        where: { date: { lt: fromDate } },
+        _sum: { quantityIn: true, quantityOut: true }
+      });
+      openingTxs.forEach(tx => {
+        const qty = Number(tx._sum.quantityIn || 0) - Number(tx._sum.quantityOut || 0);
+        const rate = productRates[tx.productId] || 0;
+        openingStockValue += Math.max(0, qty) * rate;
+      });
+      openingStockValue = Number(openingStockValue.toFixed(2));
+    }
+
     // B. Purchases during period
     const purchases = await this.prisma.purchase.aggregate({
       where: whereDate,
@@ -49,39 +72,83 @@ export class ReportsService {
     });
     const totalPurchaseReturns = Number(purchaseReturns._sum.totalAmount || 0);
 
-    const netCogs = grossPurchases - totalPurchaseReturns;
-    const openingStockValue = 0;
-    const closingStockValue = 0;
+    // D. Closing Stock Value (Stock balance up to toDate)
+    let closingStockValue = 0;
+    const closingTxWhere: any = {};
+    if (toDateStr) {
+      const toDate = new Date(`${toDateStr}T23:59:59.999+08:00`);
+      closingTxWhere.date = { lte: toDate };
+    }
+    const closingTxs = await this.prisma.stockTransaction.groupBy({
+      by: ['productId'],
+      where: closingTxWhere,
+      _sum: { quantityIn: true, quantityOut: true }
+    });
+    closingTxs.forEach(tx => {
+      const qty = Number(tx._sum.quantityIn || 0) - Number(tx._sum.quantityOut || 0);
+      const rate = productRates[tx.productId] || 0;
+      closingStockValue += Math.max(0, qty) * rate;
+    });
+    closingStockValue = Number(closingStockValue.toFixed(2));
+
+    const netCogs = Number((openingStockValue + grossPurchases - totalPurchaseReturns - closingStockValue).toFixed(2));
 
     // ----------------------------------------------------------------
 
-    const grossProfit = netOperatingRevenue - netCogs;
+    const grossProfit = Number((netOperatingRevenue - netCogs).toFixed(2));
 
-    // 5. Operating Expenses (Itemized by Category)
+    // 5. Operating Expenses (Itemized by Category & Classified)
     const expenses = await this.prisma.expense.findMany({
       where: whereDate,
       include: { category: true },
     });
 
-    const expensesByCategory: Record<string, number> = {};
+    const expensesByCategory: Record<string, { amount: number; isOperating: boolean; nature: string }> = {};
     let totalExpenses = 0;
+    let operatingExpensesTotal = 0;
+    let nonOperatingExpensesTotal = 0;
 
     for (const exp of expenses) {
       const amount = Number(exp.amount || 0);
       totalExpenses += amount;
       const catName = exp.category?.name || 'Uncategorized';
+
+      const isDrawingOrTransfer = /boss|drawing|fund|pinjam|loan|advance/i.test(catName);
+      let nature = 'Operating Expense';
+      if (/boss|drawing/i.test(catName)) nature = 'Owner Personal Drawings';
+      else if (/fund/i.test(catName)) nature = 'Fund / Reserve Transfer';
+      else if (/pinjam|loan|advance/i.test(catName)) nature = 'Staff Loan / Advance';
+
       if (!expensesByCategory[catName]) {
-        expensesByCategory[catName] = 0;
+        expensesByCategory[catName] = {
+          amount: 0,
+          isOperating: !isDrawingOrTransfer,
+          nature,
+        };
       }
-      expensesByCategory[catName] += amount;
+      expensesByCategory[catName].amount += amount;
+
+      if (isDrawingOrTransfer) {
+        nonOperatingExpensesTotal += amount;
+      } else {
+        operatingExpensesTotal += amount;
+      }
     }
 
     const itemizedExpenses = Object.keys(expensesByCategory).map(name => ({
       name,
-      amount: expensesByCategory[name],
-    }));
+      amount: Number(expensesByCategory[name].amount.toFixed(2)),
+      isOperating: expensesByCategory[name].isOperating,
+      nature: expensesByCategory[name].nature,
+    })).sort((a, b) => b.amount - a.amount);
 
-    const netProfit = grossProfit - totalExpenses;
+    totalExpenses = Number(totalExpenses.toFixed(2));
+    operatingExpensesTotal = Number(operatingExpensesTotal.toFixed(2));
+    nonOperatingExpensesTotal = Number(nonOperatingExpensesTotal.toFixed(2));
+
+    const operatingNetProfit = Number((grossProfit - operatingExpensesTotal).toFixed(2));
+    const netRetainedCash = Number((operatingNetProfit - nonOperatingExpensesTotal).toFixed(2));
+    const netProfit = netRetainedCash;
 
     return {
       grossSales,
@@ -94,6 +161,10 @@ export class ReportsService {
       netCogs,
       grossProfit,
       itemizedExpenses,
+      operatingExpensesTotal,
+      nonOperatingExpensesTotal,
+      operatingNetProfit,
+      netRetainedCash,
       totalExpenses,
       netProfit,
     };

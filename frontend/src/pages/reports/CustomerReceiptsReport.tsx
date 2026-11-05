@@ -143,14 +143,15 @@ const CustomerReceiptsReport = () => {
         totalReturns: c.totalReturns,
         netPending: c.netPending,
       }));
+      const totalReturnsAll = searchFilteredConsolidation.reduce((sum: number, i: any) => sum + Number(i.totalReturns || 0), 0);
       rows.push({
         _sno: '',
-        customerName: '',
+        customerName: 'TOTAL',
         phone: '',
         _opening: '',
         totalSales: formatCurrency(totalSales),
         totalReceipts: formatCurrency(totalCollected),
-        totalReturns: 'TOTAL:',
+        totalReturns: formatCurrency(totalReturnsAll),
         netPending: formatCurrency(totalPendingDues),
       });
       const title = `Customer Dues Consolidation Report${startDate || endDate ? ` (${startDate || 'Start'} to ${endDate || 'End'})` : ''}`;
@@ -189,18 +190,27 @@ const CustomerReceiptsReport = () => {
         } else {
           r.allocations.forEach((a: any, idx: number) => {
             const isFirst = idx === 0;
+            const isOB = !a.saleId;
+            const invNo = isOB ? 'Opening Balance' : (a.sale?.invoiceNo || '-');
+            const rawDate = isOB ? r.customer?.createdAt : a.sale?.date;
+            const invDate = rawDate ? formatMalaysiaDate(rawDate) : '-';
+            const days = rawDate ? Math.max(0, Math.floor((new Date(r.date).getTime() - new Date(rawDate).getTime()) / (1000 * 3600 * 24))).toString() : '-';
+            const origAmt = isOB ? Number(r.customer?.openingBalance || a.amount) : Number(a.sale?.grandTotal || 0);
+            const amtPaid = Number(a.amount || 0);
+            const outstanding = Math.max(0, origAmt - amtPaid);
+
             rows.push({
               receiptNo: isFirst ? r.receiptNo : '',
               _date: isFirst ? formatMalaysiaDate(r.date) : '',
               _customer: isFirst ? (r.customer?.name || '-') : '',
               amount: isFirst ? formatCurrency(r.amount) : '',
               openCr: isFirst ? formatCurrency(openCr > 0 ? openCr : 0) : '',
-              invoiceNo: a.sale?.invoiceNo || '-',
-              invoiceDate: a.sale?.date ? formatMalaysiaDate(a.sale.date) : '-',
-              days: a.sale?.date ? Math.floor((new Date(r.date).getTime() - new Date(a.sale.date).getTime()) / (1000 * 3600 * 24)).toString() : '-',
-              origAmt: formatCurrency(a.sale?.grandTotal || 0),
-              amtPaid: formatCurrency(a.amount),
-              outstanding: formatCurrency((a.sale?.grandTotal || 0) - a.amount),
+              invoiceNo: invNo,
+              invoiceDate: invDate,
+              days: days,
+              origAmt: formatCurrency(origAmt),
+              amtPaid: formatCurrency(amtPaid),
+              outstanding: formatCurrency(outstanding),
             });
           });
         }
@@ -272,18 +282,27 @@ const CustomerReceiptsReport = () => {
         } else {
           r.allocations.forEach((a: any, idx: number) => {
             const isFirst = idx === 0;
+            const isOB = !a.saleId;
+            const invNo = isOB ? 'Opening Balance' : (a.sale?.invoiceNo || '-');
+            const rawDate = isOB ? r.customer?.createdAt : a.sale?.date;
+            const invDate = rawDate ? formatMalaysiaDate(rawDate) : '-';
+            const days = rawDate ? Math.max(0, Math.floor((new Date(r.date).getTime() - new Date(rawDate).getTime()) / (1000 * 3600 * 24))).toString() : '-';
+            const origAmt = isOB ? Number(r.customer?.openingBalance || a.amount) : Number(a.sale?.grandTotal || 0);
+            const amtPaid = Number(a.amount || 0);
+            const outstanding = Math.max(0, origAmt - amtPaid);
+
             exportData.push({
               'RECEIPT': isFirst ? r.receiptNo : '',
               'DATE': isFirst ? formatMalaysiaDate(r.date) : '',
               'CUSTOMER NAME': isFirst ? (r.customer?.name || '-') : '',
               'AMT. REC.': isFirst ? formatCurrency(r.amount) : '',
               'OPEN CR': isFirst ? formatCurrency(openCr > 0 ? openCr : 0) : '',
-              'PAYMENT FOR': a.sale?.invoiceNo || '-',
-              'ON': a.sale?.date ? formatMalaysiaDate(a.sale.date) : '-',
-              'DAYS': a.sale?.date ? Math.floor((new Date(r.date).getTime() - new Date(a.sale.date).getTime()) / (1000 * 3600 * 24)).toString() : '-',
-              'ORIG. AMT': formatCurrency(a.sale?.grandTotal || 0),
-              'AMT. PAID': formatCurrency(a.amount),
-              "OUT'DING": formatCurrency((a.sale?.grandTotal || 0) - a.amount),
+              'PAYMENT FOR': invNo,
+              'ON': invDate,
+              'DAYS': days,
+              'ORIG. AMT': formatCurrency(origAmt),
+              'AMT. PAID': formatCurrency(amtPaid),
+              "OUT'DING": formatCurrency(outstanding),
             });
           });
         }
@@ -621,18 +640,32 @@ const CustomerReceiptsReport = () => {
                             <td rowSpan={rowSpan} className="px-3 py-2.5 text-right font-bold text-black border-r border-[#E2E8F0] align-top">{formatCurrency(openCr > 0 ? openCr : 0)}</td>
                             
                             {r.allocations && r.allocations.length > 0 ? (
-                              <>
-                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-black font-bold">{r.allocations[0].sale?.invoiceNo || '-'}</td>
-                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-black">{r.allocations[0].sale?.date ? formatMalaysiaDate(r.allocations[0].sale.date) : '-'}</td>
-                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-center text-black">
-                                  {r.allocations[0].sale?.date ? Math.floor((new Date(r.date).getTime() - new Date(r.allocations[0].sale.date).getTime()) / (1000 * 3600 * 24)) : '-'}
-                                </td>
-                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right text-black">{formatCurrency(r.allocations[0].sale?.grandTotal || 0)}</td>
-                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right font-bold text-[#059669]">{formatCurrency(r.allocations[0].amount)}</td>
-                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right text-black">
-                                  {formatCurrency((r.allocations[0].sale?.grandTotal || 0) - r.allocations[0].amount)}
-                                </td>
-                              </>
+                              (() => {
+                                const a = r.allocations[0];
+                                const isOB = !a.saleId;
+                                const invNo = isOB ? 'Opening Balance' : (a.sale?.invoiceNo || '-');
+                                const rawDate = isOB ? r.customer?.createdAt : a.sale?.date;
+                                const invDate = rawDate ? formatMalaysiaDate(rawDate) : '-';
+                                const days = rawDate ? Math.max(0, Math.floor((new Date(r.date).getTime() - new Date(rawDate).getTime()) / (1000 * 3600 * 24))) : '-';
+                                const origAmt = isOB ? Number(r.customer?.openingBalance || a.amount) : Number(a.sale?.grandTotal || 0);
+                                const amtPaid = Number(a.amount || 0);
+                                const outstanding = Math.max(0, origAmt - amtPaid);
+
+                                return (
+                                  <>
+                                    <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-black font-bold">{invNo}</td>
+                                    <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-black">{invDate}</td>
+                                    <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-center text-black">
+                                      {days}
+                                    </td>
+                                    <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right text-black">{formatCurrency(origAmt)}</td>
+                                    <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right font-bold text-[#059669]">{formatCurrency(amtPaid)}</td>
+                                    <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right text-black">
+                                      {formatCurrency(outstanding)}
+                                    </td>
+                                  </>
+                                );
+                              })()
                             ) : (
                               <>
                                 <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-black text-center">-</td>
@@ -645,20 +678,31 @@ const CustomerReceiptsReport = () => {
                             )}
                           </tr>
                           
-                          {r.allocations && r.allocations.slice(1).map((a: any, i: number) => (
-                            <tr key={i} className={`border-b ${i === r.allocations.length - 2 ? 'border-[#E2E8F0]' : 'border-dashed border-[#CBD5E1]'} ${idx % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'}`}>
-                              <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-black font-bold">{a.sale?.invoiceNo || '-'}</td>
-                              <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-black">{a.sale?.date ? formatMalaysiaDate(a.sale.date) : '-'}</td>
-                              <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-center text-black">
-                                {a.sale?.date ? Math.floor((new Date(r.date).getTime() - new Date(a.sale.date).getTime()) / (1000 * 3600 * 24)) : '-'}
-                              </td>
-                              <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right text-black">{formatCurrency(a.sale?.grandTotal || 0)}</td>
-                              <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right font-bold text-[#059669]">{formatCurrency(a.amount)}</td>
-                              <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right text-black">
-                                {formatCurrency((a.sale?.grandTotal || 0) - a.amount)}
-                              </td>
-                            </tr>
-                          ))}
+                          {r.allocations && r.allocations.slice(1).map((a: any, i: number) => {
+                            const isOB = !a.saleId;
+                            const invNo = isOB ? 'Opening Balance' : (a.sale?.invoiceNo || '-');
+                            const rawDate = isOB ? r.customer?.createdAt : a.sale?.date;
+                            const invDate = rawDate ? formatMalaysiaDate(rawDate) : '-';
+                            const days = rawDate ? Math.max(0, Math.floor((new Date(r.date).getTime() - new Date(rawDate).getTime()) / (1000 * 3600 * 24))) : '-';
+                            const origAmt = isOB ? Number(r.customer?.openingBalance || a.amount) : Number(a.sale?.grandTotal || 0);
+                            const amtPaid = Number(a.amount || 0);
+                            const outstanding = Math.max(0, origAmt - amtPaid);
+
+                            return (
+                              <tr key={i} className={`border-b ${i === r.allocations.length - 2 ? 'border-[#E2E8F0]' : 'border-dashed border-[#CBD5E1]'} ${idx % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'}`}>
+                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-black font-bold">{invNo}</td>
+                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-black">{invDate}</td>
+                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-center text-black">
+                                  {days}
+                                </td>
+                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right text-black">{formatCurrency(origAmt)}</td>
+                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right font-bold text-[#059669]">{formatCurrency(amtPaid)}</td>
+                                <td className="px-3 py-2.5 border-r border-[#E2E8F0] text-right text-black">
+                                  {formatCurrency(outstanding)}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </React.Fragment>
                       );
                     })

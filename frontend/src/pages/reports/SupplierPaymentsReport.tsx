@@ -142,14 +142,15 @@ const SupplierPaymentsReport = () => {
         totalReturns: s.totalReturns,
         netPending: s.netPending,
       }));
+      const totalReturnsAll = searchFilteredConsolidation.reduce((sum: number, i: any) => sum + Number(i.totalReturns || 0), 0);
       rows.push({
         _sno: '',
-        supplierName: '',
+        supplierName: 'TOTAL',
         phone: '',
         _opening: '',
         totalPurchases: formatCurrency(totalPurchases),
         totalPayments: formatCurrency(totalPaid),
-        totalReturns: 'TOTAL:',
+        totalReturns: formatCurrency(totalReturnsAll),
         netPending: formatCurrency(totalPendingPayables),
       });
       const title = `Supplier Payables Consolidation Report${startDate || endDate ? ` (${startDate || 'Start'} to ${endDate || 'End'})` : ''}`;
@@ -188,18 +189,27 @@ const SupplierPaymentsReport = () => {
         } else {
           p.allocations.forEach((a: any, idx: number) => {
             const isFirst = idx === 0;
+            const isOB = !a.purchaseId;
+            const invNo = isOB ? 'Opening Balance' : (a.purchase?.entryNo || '-');
+            const rawDate = isOB ? p.supplier?.createdAt : a.purchase?.date;
+            const invDate = rawDate ? formatMalaysiaDate(rawDate) : '-';
+            const days = rawDate ? Math.max(0, Math.floor((new Date(p.date).getTime() - new Date(rawDate).getTime()) / (1000 * 3600 * 24))).toString() : '-';
+            const origAmt = isOB ? Number(p.supplier?.openingBalance || a.amount) : Number(a.purchase?.netTotal || 0);
+            const amtPaid = Number(a.amount || 0);
+            const outstanding = Math.max(0, origAmt - amtPaid);
+
             rows.push({
               paymentNo: isFirst ? p.paymentNo : '',
               _date: isFirst ? formatMalaysiaDate(p.date) : '',
               _supplier: isFirst ? (p.supplier?.name || '-') : '',
               amount: isFirst ? formatCurrency(p.amount) : '',
               openCr: isFirst ? formatCurrency(openCr > 0 ? openCr : 0) : '',
-              invoiceNo: a.purchase?.entryNo || '-',
-              invoiceDate: a.purchase?.date ? formatMalaysiaDate(a.purchase.date) : '-',
-              days: a.purchase?.date ? Math.floor((new Date(p.date).getTime() - new Date(a.purchase.date).getTime()) / (1000 * 3600 * 24)).toString() : '-',
-              origAmt: formatCurrency(a.purchase?.netTotal || 0),
-              amtPaid: formatCurrency(a.amount),
-              outstanding: formatCurrency((a.purchase?.netTotal || 0) - a.amount),
+              invoiceNo: invNo,
+              invoiceDate: invDate,
+              days: days,
+              origAmt: formatCurrency(origAmt),
+              amtPaid: formatCurrency(amtPaid),
+              outstanding: formatCurrency(outstanding),
             });
           });
         }
@@ -271,18 +281,27 @@ const SupplierPaymentsReport = () => {
         } else {
           p.allocations.forEach((a: any, idx: number) => {
             const isFirst = idx === 0;
+            const isOB = !a.purchaseId;
+            const invNo = isOB ? 'Opening Balance' : (a.purchase?.entryNo || '-');
+            const rawDate = isOB ? p.supplier?.createdAt : a.purchase?.date;
+            const invDate = rawDate ? formatMalaysiaDate(rawDate) : '-';
+            const days = rawDate ? Math.max(0, Math.floor((new Date(p.date).getTime() - new Date(rawDate).getTime()) / (1000 * 3600 * 24))).toString() : '-';
+            const origAmt = isOB ? Number(p.supplier?.openingBalance || a.amount) : Number(a.purchase?.netTotal || 0);
+            const amtPaid = Number(a.amount || 0);
+            const outstanding = Math.max(0, origAmt - amtPaid);
+
             exportData.push({
               'PAYMENT NO': isFirst ? p.paymentNo : '',
               'DATE': isFirst ? formatMalaysiaDate(p.date) : '',
               'SUPPLIER NAME': isFirst ? (p.supplier?.name || '-') : '',
               'AMT. PAID': isFirst ? formatCurrency(p.amount) : '',
               'OPEN BAL': isFirst ? formatCurrency(openCr > 0 ? openCr : 0) : '',
-              'PAYMENT FOR': a.purchase?.entryNo || '-',
-              'ON': a.purchase?.date ? formatMalaysiaDate(a.purchase.date) : '-',
-              'DAYS': a.purchase?.date ? Math.floor((new Date(p.date).getTime() - new Date(a.purchase.date).getTime()) / (1000 * 3600 * 24)).toString() : '-',
-              'ORIG. AMT': formatCurrency(a.purchase?.netTotal || 0),
-              'AMT. ALLOC.': formatCurrency(a.amount),
-              "OUT'DING": formatCurrency((a.purchase?.netTotal || 0) - a.amount),
+              'PAYMENT FOR': invNo,
+              'ON': invDate,
+              'DAYS': days,
+              'ORIG. AMT': formatCurrency(origAmt),
+              'AMT. ALLOC.': formatCurrency(amtPaid),
+              "OUT'DING": formatCurrency(outstanding),
             });
           });
         }

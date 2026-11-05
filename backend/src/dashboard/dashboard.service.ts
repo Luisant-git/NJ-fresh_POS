@@ -119,11 +119,11 @@ export class DashboardService {
 
     // Monthly Chart Data (group by date)
     const chartDataRaw: any[] = await this.prisma.$queryRaw`
-      SELECT DATE(s."date") as "name", SUM(s."grandTotal") as "sales"
+      SELECT DATE(s."date" + interval '8 hours') as "name", SUM(s."grandTotal") as "sales"
       FROM "Sale" s
       WHERE s."date" >= ${firstDayOfMonth}
-      GROUP BY DATE(s."date")
-      ORDER BY DATE(s."date") ASC
+      GROUP BY DATE(s."date" + interval '8 hours')
+      ORDER BY DATE(s."date" + interval '8 hours') ASC
     `;
     const chartData = chartDataRaw.map((d) => {
       const dateObj = new Date(d.name);

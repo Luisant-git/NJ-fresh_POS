@@ -24,9 +24,7 @@ export class ExpensesService {
       where.date = {};
       if (query.startDate) where.date.gte = new Date(`${query.startDate}T00:00:00+08:00`);
       if (query.endDate) {
-        const end = new Date(query.endDate);
-        end.setHours(23, 59, 59, 999);
-        where.date.lte = end;
+        where.date.lte = new Date(`${query.endDate}T23:59:59.999+08:00`);
       }
     }
     if (query?.categoryId) {
@@ -66,7 +64,7 @@ export class ExpensesService {
     return this.prisma.expense.update({
       where: { id },
       data: {
-        date: updateData.date ? new Date(updateData.date) : undefined,
+        date: updateData.date ? new Date(`${updateData.date}T00:00:00+08:00`) : undefined,
         amount: updateData.amount,
         notes: updateData.notes,
         expenseCategoryId: updateData.expenseCategoryId,

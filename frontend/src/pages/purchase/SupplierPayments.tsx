@@ -93,7 +93,11 @@ const SupplierPayments = () => {
     const fetchBalance = async () => {
       if (selectedSupplierId && selectedSupplierId > 0) {
         try {
-          const res = await api.get(`/supplier-payments/balance/${selectedSupplierId}`);
+          let balUrl = `/supplier-payments/balance/${selectedSupplierId}`;
+          if (editingId) {
+            balUrl += `?excludePaymentId=${editingId}`;
+          }
+          const res = await api.get(balUrl);
           setCurrentBalance(res.data.balance);
           
           let url = `/supplier-payments/unpaid-bills/${selectedSupplierId}`;
@@ -151,6 +155,13 @@ const SupplierPayments = () => {
   });
 
   const onSubmit = (data: PaymentFormValues) => {
+    const totalAlloc = Object.values(allocations).reduce((sum, curr) => sum + (Number(curr) || 0), 0);
+    const enteredAmount = Number(data.amount) || 0;
+    if (totalAlloc > enteredAmount + 0.009) {
+      toast.error(`Total allocated amount (${formatCurrency(totalAlloc)}) cannot exceed payment amount (${formatCurrency(enteredAmount)})`);
+      return;
+    }
+
     const payload = {
       ...data,
       allocations: Object.entries(allocations).map(([purchaseId, amount]) => ({
@@ -756,6 +767,7 @@ const SupplierPayments = () => {
                                 });
                               }
                               setAllocations(existingAllocs);
+                              setShowBreakdown(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
                             className="bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] px-2 py-1 rounded text-[11px] font-bold border border-[#BFDBFE] transition-colors"

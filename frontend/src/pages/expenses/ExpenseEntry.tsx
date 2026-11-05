@@ -106,7 +106,7 @@ const ExpenseEntry = () => {
 
   const handleEdit = (exp: any) => {
     setEditingId(exp.id);
-    setExpenseDate(exp.date ? exp.date.substring(0, 10) : getMalaysiaDateStr());
+    setExpenseDate(exp.date ? getMalaysiaDateStr(exp.date) : getMalaysiaDateStr());
     setCategoryId(exp.expenseCategoryId?.toString() || '');
     setAmount(exp.amount?.toString() || '');
     setPaymentModeId(exp.paymentModeId?.toString() || '');

@@ -13,8 +13,11 @@ export class SupplierPaymentsController {
   }
 
   @Get('balance/:id')
-  async getBalance(@Param('id') id: string) {
-    return this.supplierPaymentsService.getBalance(Number(id));
+  async getBalance(
+    @Param('id') id: string,
+    @Query('excludePaymentId') excludePaymentId?: string
+  ) {
+    return this.supplierPaymentsService.getBalance(Number(id), excludePaymentId ? Number(excludePaymentId) : undefined);
   }
 
   @Get('consolidation-report')

@@ -23,9 +23,7 @@ export class ChequeEntriesService {
       where.chequeDate = {};
       if (query.startDate) where.chequeDate.gte = new Date(`${query.startDate}T00:00:00+08:00`);
       if (query.endDate) {
-        const end = new Date(query.endDate);
-        end.setHours(23, 59, 59, 999);
-        where.chequeDate.lte = end;
+        where.chequeDate.lte = new Date(`${query.endDate}T23:59:59.999+08:00`);
       }
     }
     if (query?.search) {

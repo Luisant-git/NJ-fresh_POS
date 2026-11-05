@@ -1,4 +1,4 @@
-﻿import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -9,6 +9,13 @@ export class SupplierPaymentsService {
     // Basic validation
     if (!data.paymentNo || !data.supplierId || !data.amount || !data.paymentTypeId) {
       throw new BadRequestException('Missing required fields');
+    }
+
+    const totalAllocated = data.allocations && Array.isArray(data.allocations)
+      ? data.allocations.reduce((sum: number, a: any) => sum + (Number(a.amount) || 0), 0)
+      : 0;
+    if (totalAllocated > Number(data.amount) + 0.009) {
+      throw new BadRequestException(`Allocations total (${totalAllocated.toFixed(2)}) cannot exceed payment amount (${Number(data.amount).toFixed(2)})`);
     }
 
     try {
@@ -43,6 +50,13 @@ export class SupplierPaymentsService {
   async update(id: number, data: any, userId: number) {
     if (!data.supplierId || !data.amount || !data.paymentTypeId) {
       throw new BadRequestException('Missing required fields');
+    }
+
+    const totalAllocated = data.allocations && Array.isArray(data.allocations)
+      ? data.allocations.reduce((sum: number, a: any) => sum + (Number(a.amount) || 0), 0)
+      : 0;
+    if (totalAllocated > Number(data.amount) + 0.009) {
+      throw new BadRequestException(`Allocations total (${totalAllocated.toFixed(2)}) cannot exceed payment amount (${Number(data.amount).toFixed(2)})`);
     }
 
     try {
@@ -92,7 +106,7 @@ export class SupplierPaymentsService {
     });
   }
 
-  async getBalance(supplierId: number) {
+  async getBalance(supplierId: number, excludePaymentId?: number) {
     const supplier = await this.prisma.supplier.findUnique({
       where: { id: supplierId },
     });
@@ -117,7 +131,10 @@ export class SupplierPaymentsService {
 
     // Sum of all payments
     const payments = await this.prisma.supplierPayment.aggregate({
-      where: { supplierId },
+      where: { 
+        supplierId,
+        ...(excludePaymentId ? { id: { not: excludePaymentId } } : {})
+      },
       _sum: { amount: true },
     });
 
@@ -139,7 +156,7 @@ export class SupplierPaymentsService {
     const totalPaid = Number(payments._sum.amount) || 0;
     const totalReturns = Number(purchaseReturns._sum.totalAmount) || 0;
 
-    const balance = totalOwed + totalPurchases - totalPaid - totalReturns;
+    const balance = Number((totalOwed + totalPurchases - totalPaid - totalReturns).toFixed(2));
 
     return { balance, totalReturns };
   }
@@ -188,17 +205,45 @@ export class SupplierPaymentsService {
       });
     }
     
+    // 2. Fetch Opening Balance & Purchases (in chronological order)
+    const openingBalance = Number(supplier.openingBalance) || 0;
+    const isOpeningCredit = supplier.openingBalanceType === 'Cr'; // Cr means we owe them
+    const isOpeningDebit = supplier.openingBalanceType === 'Dr';
+
     let totalOldUnallocatedPaid = 0;
-    allPayments.forEach(p => {
-      if (excludePaymentId && p.id === excludePaymentId) return; // Skip this payment!
+    const mappedAllocations: Record<string | number, number> = {};
+
+    for (const p of allPayments) {
+      if (excludePaymentId && p.id === excludePaymentId) continue;
       const paymentAmount = Number(p.amount) || 0;
       if (!p.allocations || p.allocations.length === 0) {
         totalOldUnallocatedPaid += paymentAmount;
       } else {
-        const allocatedToBills = p.allocations.reduce((sum, a) => sum + (a.purchaseId ? Number(a.amount) : 0), 0);
-        totalOldUnallocatedPaid += (paymentAmount - allocatedToBills);
+        const rawAllocSum = p.allocations.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+        const factor = rawAllocSum > paymentAmount && rawAllocSum > 0 ? (paymentAmount / rawAllocSum) : 1;
+        let effectiveAllocSum = 0;
+
+        for (const a of p.allocations) {
+          const amt = (Number(a.amount) || 0) * factor;
+          effectiveAllocSum += amt;
+
+          if (a.purchaseId) {
+            mappedAllocations[a.purchaseId] = (mappedAllocations[a.purchaseId] || 0) + amt;
+          } else {
+            if (isOpeningCredit && openingBalance > 0) {
+              mappedAllocations['OB'] = (mappedAllocations['OB'] || 0) + amt;
+            } else {
+              totalOldUnallocatedPaid += amt;
+            }
+          }
+        }
+
+        const unallocated = paymentAmount - effectiveAllocSum;
+        if (unallocated > 0.009) {
+          totalOldUnallocatedPaid += unallocated;
+        }
       }
-    });
+    }
 
     const purchaseReturns = await this.prisma.purchaseReturn.findMany({
       where: { supplierId },
@@ -218,40 +263,21 @@ export class SupplierPaymentsService {
 
     // We add unmapped returns to the total pool of unallocated credits
     totalOldUnallocatedPaid += unmappedReturns;
-
-    // Get specific bill allocations
-    const allAllocations = await this.prisma.supplierPaymentAllocation.findMany({
-      where: {
-        supplierPayment: { supplierId }
-      }
-    });
-    
-    const mappedAllocations: Record<number, number> = {};
-    allAllocations.forEach(a => {
-      if (excludePaymentId && a.supplierPaymentId === excludePaymentId) return; // Skip this allocation!
-      if (a.purchaseId) {
-        mappedAllocations[a.purchaseId] = (mappedAllocations[a.purchaseId] || 0) + Number(a.amount);
-      }
-    });
-
-    // 2. Fetch Opening Balance & Purchases (in chronological order)
-    const openingBalance = Number(supplier.openingBalance) || 0;
-    const isOpeningCredit = supplier.openingBalanceType === 'Cr'; // Cr means we owe them
-    const isOpeningDebit = supplier.openingBalanceType === 'Dr';
     
     let bills: any[] = [];
     
     // If we owe them an opening balance, treat it as the first bill
     if (isOpeningCredit && openingBalance > 0) {
+      const obAllocated = mappedAllocations['OB'] || 0;
       bills.push({
         id: 'OB', // Special ID for opening balance
         entryNo: 'Opening Balance',
         date: supplier.createdAt,
         total: openingBalance,
         returned: 0,
-        allocated: 0, // Opening balance has no direct allocations right now
-        received: 0,
-        pending: openingBalance,
+        allocated: obAllocated,
+        received: obAllocated,
+        pending: Math.max(0, Number((openingBalance - obAllocated).toFixed(2))),
         isOpeningBalance: true
       });
     } else if (isOpeningDebit && openingBalance > 0) {
@@ -276,6 +302,7 @@ export class SupplierPaymentsService {
       const billTotal = Number(purchase.grandTotal) || 0;
       const returnedAmt = mappedReturns[purchase.id] || 0;
       const allocatedAmt = mappedAllocations[purchase.id] || 0;
+      const initialPending = Math.max(0, Number((billTotal - returnedAmt - allocatedAmt).toFixed(2)));
       
       bills.push({
         id: purchase.id,
@@ -284,8 +311,8 @@ export class SupplierPaymentsService {
         total: billTotal,
         returned: returnedAmt,
         allocated: allocatedAmt,
-        received: 0, // This will be calculated including FIFO
-        pending: billTotal - returnedAmt - allocatedAmt,
+        received: allocatedAmt,
+        pending: initialPending,
         isOpeningBalance: false
       });
     }
@@ -297,7 +324,7 @@ export class SupplierPaymentsService {
       // Calculate total received initially from specific allocations
       bill.received = bill.allocated;
 
-      if (remainingPending <= 0) {
+      if (remainingPending <= 0.009) {
          bill.pending = 0;
          continue;
       }
@@ -309,25 +336,25 @@ export class SupplierPaymentsService {
 
       const currentTotalPaid = Number(totalOldUnallocatedPaid.toFixed(2));
 
-      if (remainingPending <= 0) {
+      if (remainingPending <= 0.009) {
          bill.pending = 0;
          continue;
       }
 
       if (currentTotalPaid >= remainingPending) {
         // Fully paid by FIFO
-        bill.received += remainingPending;
+        bill.received = Number((bill.received + remainingPending).toFixed(2));
         bill.pending = 0;
-        totalOldUnallocatedPaid -= remainingPending;
+        totalOldUnallocatedPaid = Number((totalOldUnallocatedPaid - remainingPending).toFixed(2));
       } else if (currentTotalPaid > 0 && currentTotalPaid < remainingPending) {
         // Partially paid by FIFO
-        bill.received += currentTotalPaid;
+        bill.received = Number((bill.received + currentTotalPaid).toFixed(2));
         bill.pending = Number((remainingPending - currentTotalPaid).toFixed(2));
         totalOldUnallocatedPaid = 0;
       }
     }
 
-    return bills.filter(b => b.pending > 0);
+    return bills;
   }
 
   async getConsolidationReport(startDate?: string, endDate?: string) {

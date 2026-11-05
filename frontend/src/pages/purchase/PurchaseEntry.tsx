@@ -117,9 +117,9 @@ const PurchaseEntry = () => {
       reset({
         entryNo: existingPurchase.invoiceNo,
         invoiceNo: existingPurchase.supplierInvoiceNo || '',
-        invoiceDate: existingPurchase.invoiceDate ? existingPurchase.invoiceDate.split('T')[0] : '',
+        invoiceDate: existingPurchase.invoiceDate ? getMalaysiaDateStr(existingPurchase.invoiceDate) : '',
         supplierId: existingPurchase.supplierId,
-        date: existingPurchase.date ? existingPurchase.date.split('T')[0] : '',
+        date: existingPurchase.date ? getMalaysiaDateStr(existingPurchase.date) : '',
         paymentModeId: existingPurchase.paymentModeId,
         items: existingPurchase.items.map((item: any) => ({
           productId: item.productId,

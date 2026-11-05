@@ -13,8 +13,11 @@ export class CustomerReceiptsController {
   }
 
   @Get('balance/:id')
-  async getBalance(@Param('id') id: string) {
-    return this.customerReceiptsService.getBalance(Number(id));
+  async getBalance(
+    @Param('id') id: string,
+    @Query('excludeReceiptId') excludeReceiptId?: string
+  ) {
+    return this.customerReceiptsService.getBalance(Number(id), excludeReceiptId ? Number(excludeReceiptId) : undefined);
   }
 
   @Get('consolidation-report')

@@ -10,6 +10,13 @@ export class CustomerReceiptsService {
       throw new BadRequestException('Missing required fields');
     }
 
+    const totalAllocated = data.allocations && Array.isArray(data.allocations)
+      ? data.allocations.reduce((sum: number, a: any) => sum + (Number(a.amount) || 0), 0)
+      : 0;
+    if (totalAllocated > Number(data.amount) + 0.009) {
+      throw new BadRequestException(`Allocations total (${totalAllocated.toFixed(2)}) cannot exceed receipt amount (${Number(data.amount).toFixed(2)})`);
+    }
+
     try {
       return await this.prisma.customerReceipt.create({
         data: {
@@ -42,6 +49,13 @@ export class CustomerReceiptsService {
   async update(id: number, data: any, userId: number) {
     if (!data.customerId || !data.amount || !data.paymentTypeId) {
       throw new BadRequestException('Missing required fields');
+    }
+
+    const totalAllocated = data.allocations && Array.isArray(data.allocations)
+      ? data.allocations.reduce((sum: number, a: any) => sum + (Number(a.amount) || 0), 0)
+      : 0;
+    if (totalAllocated > Number(data.amount) + 0.009) {
+      throw new BadRequestException(`Allocations total (${totalAllocated.toFixed(2)}) cannot exceed receipt amount (${Number(data.amount).toFixed(2)})`);
     }
 
     try {
@@ -91,7 +105,7 @@ export class CustomerReceiptsService {
     });
   }
 
-  async getBalance(customerId: number) {
+  async getBalance(customerId: number, excludeReceiptId?: number) {
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
     });
@@ -116,7 +130,10 @@ export class CustomerReceiptsService {
 
     // Sum of all receipts
     const receipts = await this.prisma.customerReceipt.aggregate({
-      where: { customerId },
+      where: { 
+        customerId,
+        ...(excludeReceiptId ? { id: { not: excludeReceiptId } } : {})
+      },
       _sum: { amount: true },
     });
 
@@ -138,7 +155,7 @@ export class CustomerReceiptsService {
     const totalSales = Number(sales._sum.grandTotal) || 0;
     const totalCollected = Number(receipts._sum.amount) || 0;
 
-    const balance = totalOwed + totalSales - totalCollected - totalReturns;
+    const balance = Number((totalOwed + totalSales - totalCollected - totalReturns).toFixed(2));
 
     return { balance, totalReturns };
   }
@@ -187,17 +204,45 @@ export class CustomerReceiptsService {
       });
     }
     
+    // 2. Fetch Opening Balance & Sales (in chronological order)
+    const openingBalance = Number(customer.openingBalance) || 0;
+    const isOpeningDebit = customer.openingBalanceType === 'Dr'; // Dr means they owe us
+    const isOpeningCredit = customer.openingBalanceType === 'Cr';
+
     let totalOldUnallocatedCollected = 0;
-    allReceipts.forEach(r => {
-      if (excludeReceiptId && r.id === excludeReceiptId) return; // Skip this receipt!
+    const mappedAllocations: Record<string | number, number> = {};
+
+    for (const r of allReceipts) {
+      if (excludeReceiptId && r.id === excludeReceiptId) continue;
       const receiptAmount = Number(r.amount) || 0;
       if (!r.allocations || r.allocations.length === 0) {
         totalOldUnallocatedCollected += receiptAmount;
       } else {
-        const allocatedToBills = r.allocations.reduce((sum, a) => sum + (a.saleId ? Number(a.amount) : 0), 0);
-        totalOldUnallocatedCollected += (receiptAmount - allocatedToBills);
+        const rawAllocSum = r.allocations.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+        const factor = rawAllocSum > receiptAmount && rawAllocSum > 0 ? (receiptAmount / rawAllocSum) : 1;
+        let effectiveAllocSum = 0;
+
+        for (const a of r.allocations) {
+          const amt = (Number(a.amount) || 0) * factor;
+          effectiveAllocSum += amt;
+
+          if (a.saleId) {
+            mappedAllocations[a.saleId] = (mappedAllocations[a.saleId] || 0) + amt;
+          } else {
+            if (isOpeningDebit && openingBalance > 0) {
+              mappedAllocations['OB'] = (mappedAllocations['OB'] || 0) + amt;
+            } else {
+              totalOldUnallocatedCollected += amt;
+            }
+          }
+        }
+
+        const unallocated = receiptAmount - effectiveAllocSum;
+        if (unallocated > 0.009) {
+          totalOldUnallocatedCollected += unallocated;
+        }
       }
-    });
+    }
 
     const salesReturns = await this.prisma.salesReturn.findMany({
       where: { customerId },
@@ -217,40 +262,21 @@ export class CustomerReceiptsService {
 
     // We add unmapped returns to the total pool of unallocated payments
     totalOldUnallocatedCollected += unmappedReturns;
-
-    // Get specific bill allocations
-    const allAllocations = await this.prisma.customerReceiptAllocation.findMany({
-      where: {
-        customerReceipt: { customerId }
-      }
-    });
-    
-    const mappedAllocations: Record<number, number> = {};
-    allAllocations.forEach(a => {
-      if (excludeReceiptId && a.customerReceiptId === excludeReceiptId) return; // Skip this allocation!
-      if (a.saleId) {
-        mappedAllocations[a.saleId] = (mappedAllocations[a.saleId] || 0) + Number(a.amount);
-      }
-    });
-
-    // 2. Fetch Opening Balance & Sales (in chronological order)
-    const openingBalance = Number(customer.openingBalance) || 0;
-    const isOpeningDebit = customer.openingBalanceType === 'Dr'; // Dr means they owe us
-    const isOpeningCredit = customer.openingBalanceType === 'Cr';
     
     let bills: any[] = [];
     
     // If they owe us an opening balance, treat it as the first bill
     if (isOpeningDebit && openingBalance > 0) {
+      const obAllocated = mappedAllocations['OB'] || 0;
       bills.push({
         id: 'OB', // Special ID for opening balance
         entryNo: 'Opening Balance',
         date: customer.createdAt, // Or a specific OB date if available
         total: openingBalance,
         returned: 0,
-        allocated: 0, // Opening balance has no direct allocations right now
-        received: 0,
-        pending: openingBalance,
+        allocated: obAllocated,
+        received: obAllocated,
+        pending: Math.max(0, Number((openingBalance - obAllocated).toFixed(2))),
         isOpeningBalance: true
       });
     } else if (isOpeningCredit && openingBalance > 0) {
@@ -275,6 +301,7 @@ export class CustomerReceiptsService {
       const billTotal = Number(sale.grandTotal) || 0;
       const returnedAmt = mappedReturns[sale.id] || 0;
       const allocatedAmt = mappedAllocations[sale.id] || 0;
+      const initialPending = Math.max(0, Number((billTotal - returnedAmt - allocatedAmt).toFixed(2)));
       
       bills.push({
         id: sale.id,
@@ -283,8 +310,8 @@ export class CustomerReceiptsService {
         total: billTotal,
         returned: returnedAmt,
         allocated: allocatedAmt,
-        received: 0,
-        pending: billTotal - returnedAmt - allocatedAmt,
+        received: allocatedAmt,
+        pending: initialPending,
         isOpeningBalance: false
       });
     }
@@ -296,7 +323,7 @@ export class CustomerReceiptsService {
       // Calculate total received initially from specific allocations
       bill.received = bill.allocated;
 
-      if (remainingPending <= 0) {
+      if (remainingPending <= 0.009) {
          bill.pending = 0;
          continue;
       }
@@ -309,25 +336,25 @@ export class CustomerReceiptsService {
 
       const currentTotalCollected = Number(totalOldUnallocatedCollected.toFixed(2));
 
-      if (remainingPending <= 0) {
+      if (remainingPending <= 0.009) {
          bill.pending = 0;
          continue;
       }
 
       if (currentTotalCollected >= remainingPending) {
         // Fully paid by FIFO
-        bill.received += remainingPending;
+        bill.received = Number((bill.received + remainingPending).toFixed(2));
         bill.pending = 0;
-        totalOldUnallocatedCollected -= remainingPending;
+        totalOldUnallocatedCollected = Number((totalOldUnallocatedCollected - remainingPending).toFixed(2));
       } else if (currentTotalCollected > 0 && currentTotalCollected < remainingPending) {
         // Partially paid by FIFO
-        bill.received += currentTotalCollected;
+        bill.received = Number((bill.received + currentTotalCollected).toFixed(2));
         bill.pending = Number((remainingPending - currentTotalCollected).toFixed(2));
         totalOldUnallocatedCollected = 0;
       }
     }
 
-    return bills.filter(b => b.pending > 0);
+    return bills;
   }
 
   async getConsolidationReport(startDate?: string, endDate?: string) {

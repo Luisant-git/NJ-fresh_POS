@@ -5,22 +5,22 @@ import { TransactionType } from '@prisma/client';
 
 @Injectable()
 export class SalesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createSaleDto: CreateSaleDto, userId: number) {
     // Execute in a transaction to guarantee data integrity between sale and stock ledger
     return this.prisma.$transaction(async (tx) => {
-      
+
       // 0. Auto-generate the correct invoice number safely inside the transaction
       const settings = await tx.settings.findUnique({ where: { id: 1 } });
       const prefix = settings?.invoicePrefix || 'INV-';
-      
+
       let whereCondition: any = {};
       if (settings?.yearlyInvoiceReset) {
         const startOfYear = new Date(new Date().getFullYear(), 0, 1);
         whereCondition = { date: { gte: startOfYear } };
       }
-      
+
       const lastSale = await tx.sale.findFirst({
         where: {
           ...whereCondition,
@@ -160,7 +160,7 @@ export class SalesService {
   async getNextInvoiceNo() {
     const settings = await this.prisma.settings.findUnique({ where: { id: 1 } });
     const prefix = settings?.invoicePrefix || 'INV-';
-    
+
     let whereCondition: any = {};
     if (settings?.yearlyInvoiceReset) {
       const startOfYear = new Date(new Date().getFullYear(), 0, 1);
@@ -184,7 +184,7 @@ export class SalesService {
         nextNumber = parseInt(match[1], 10) + 1;
       }
     }
-    
+
     return `${prefix}${String(nextNumber).padStart(5, '0')}`;
   }
 
@@ -236,6 +236,14 @@ export class SalesService {
 
   async update(id: number, createSaleDto: CreateSaleDto, userId: number) {
     return this.prisma.$transaction(async (tx) => {
+      // Lock this sale row to prevent concurrent edits.
+      await tx.$queryRaw`
+        SELECT id
+        FROM "Sale"
+        WHERE id = ${id}
+        FOR UPDATE
+      `;
+
       const existingSale = await tx.sale.findUnique({
         where: { id },
         include: { items: true },

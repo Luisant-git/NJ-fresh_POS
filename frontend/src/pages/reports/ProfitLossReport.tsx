@@ -9,7 +9,7 @@ import ReportTabs from '../../components/ReportTabs';
 import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 
 const ProfitLossReport = () => {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, settings } = useSettings();
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [activePreset, setActivePreset] = useState<string>('month');
@@ -53,14 +53,30 @@ const ProfitLossReport = () => {
     grossSales: 0,
     totalSalesReturns: 0,
     netOperatingRevenue: 0,
+    openingStockValue: 0,
     grossPurchases: 0,
     totalPurchaseReturns: 0,
+    closingStockValue: 0,
     netCogs: 0,
     grossProfit: 0,
     itemizedExpenses: [],
+    operatingExpensesTotal: 0,
+    nonOperatingExpensesTotal: 0,
+    operatingNetProfit: 0,
+    netRetainedCash: 0,
     totalExpenses: 0,
     netProfit: 0,
   };
+
+  const operatingExpenses = (safePnl.itemizedExpenses || []).filter((e: any) => e.isOperating !== false);
+  const nonOperatingExpenses = (safePnl.itemizedExpenses || []).filter((e: any) => e.isOperating === false);
+
+  const grossProfitMargin = safePnl.netOperatingRevenue > 0 ? (safePnl.grossProfit / safePnl.netOperatingRevenue) * 100 : 0;
+  const operatingProfitVal = safePnl.operatingNetProfit !== undefined ? safePnl.operatingNetProfit : (safePnl.grossProfit - (safePnl.operatingExpensesTotal ?? safePnl.totalExpenses));
+  const operatingProfitMargin = safePnl.netOperatingRevenue > 0 ? (operatingProfitVal / safePnl.netOperatingRevenue) * 100 : 0;
+  const netRetainedVal = safePnl.netRetainedCash !== undefined ? safePnl.netRetainedCash : safePnl.netProfit;
+  const netRetainedMargin = safePnl.netOperatingRevenue > 0 ? (netRetainedVal / safePnl.netOperatingRevenue) * 100 : 0;
+  const isLoss = operatingProfitVal < 0;
 
   const exportToCsv = () => {
     const rows = [
@@ -73,15 +89,26 @@ const ProfitLossReport = () => {
       ['NET OPERATING REVENUE', safePnl.netOperatingRevenue],
       [],
       ['II. COST OF GOODS SOLD', 'AMOUNT'],
+      ...(safePnl.openingStockValue > 0 ? [['Opening Stock Value', safePnl.openingStockValue]] : []),
       ['Add: Gross Purchases', safePnl.grossPurchases],
       ['Less: Purchase Returns', `-${safePnl.totalPurchaseReturns}`],
+      ['Less: Closing Stock Value (Inventory)', `-${safePnl.closingStockValue}`],
       ['NET COST OF GOODS SOLD', safePnl.netCogs],
       ['GROSS PROFIT', safePnl.grossProfit],
       [],
-      ['III. OPERATING EXPENSES', 'AMOUNT'],
-      ['TOTAL OPERATING EXPENSES', safePnl.totalExpenses],
+      ['III. STORE OPERATING EXPENSES', 'AMOUNT'],
+      ...operatingExpenses.map((e: any) => [`  ${e.name}`, e.amount]),
+      ['TOTAL OPERATING EXPENSES', safePnl.operatingExpensesTotal ?? safePnl.totalExpenses],
       [],
-      ['NET PROFIT FOR PERIOD', safePnl.netProfit]
+      ['STORE OPERATING NET PROFIT', operatingProfitVal],
+      ...(nonOperatingExpenses.length > 0 ? [
+        [],
+        ['IV. OWNER DRAWINGS & FUND TRANSFERS', 'AMOUNT'],
+        ...nonOperatingExpenses.map((e: any) => [`  ${e.name} (${e.nature || 'Drawings/Transfer'})`, e.amount]),
+        ['TOTAL DRAWINGS & TRANSFERS', safePnl.nonOperatingExpensesTotal],
+        [],
+        ['NET CASH RETAINED AFTER DRAWINGS', netRetainedVal]
+      ] : [])
     ];
 
     const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
@@ -96,22 +123,20 @@ const ProfitLossReport = () => {
 
   const chartData = pnl ? [
     { name: 'Gross Sales', value: safePnl.grossSales, color: '#2563EB' },
-    { name: 'Sales Returns', value: safePnl.totalSalesReturns, color: '#93C5FD' },
     { name: 'Purchases', value: safePnl.grossPurchases, color: '#D97706' },
-    { name: 'Purchase Returns', value: safePnl.totalPurchaseReturns, color: '#FCD34D' },
-    { name: 'Operating Expenses', value: safePnl.totalExpenses, color: '#EF4444' },
+    { name: 'Closing Stock', value: safePnl.closingStockValue, color: '#10B981' },
+    { name: 'Operating Exp', value: safePnl.operatingExpensesTotal ?? safePnl.totalExpenses, color: '#EF4444' },
+    ...(safePnl.nonOperatingExpensesTotal > 0 ? [
+      { name: 'Drawings/Fund', value: safePnl.nonOperatingExpensesTotal, color: '#8B5CF6' }
+    ] : [])
   ] : [];
 
   const barData = pnl ? [
     { name: 'Revenue', amount: safePnl.netOperatingRevenue, fill: '#2563EB' },
     { name: 'COGS', amount: safePnl.netCogs, fill: '#D97706' },
-    { name: 'Expenses', amount: safePnl.totalExpenses, fill: '#EF4444' },
-    { name: 'Net Profit', amount: safePnl.netProfit, fill: safePnl.netProfit >= 0 ? '#10B981' : '#EF4444' },
+    { name: 'Operating Exp', amount: safePnl.operatingExpensesTotal ?? safePnl.totalExpenses, fill: '#EF4444' },
+    { name: 'Store Profit', amount: operatingProfitVal, fill: operatingProfitVal >= 0 ? '#10B981' : '#EF4444' },
   ] : [];
-
-  const isLoss = safePnl.netProfit < 0;
-  const grossProfitMargin = safePnl.netOperatingRevenue > 0 ? (safePnl.grossProfit / safePnl.netOperatingRevenue) * 100 : 0;
-  const netProfitMargin = safePnl.netOperatingRevenue > 0 ? (safePnl.netProfit / safePnl.netOperatingRevenue) * 100 : 0;
 
   const presetBtnClass = (preset: string) => 
     `px-2 py-0.5 text-[11px] rounded transition-colors shadow-sm font-bold ${activePreset === preset ? 'bg-[#1F2937] text-white shadow-md' : 'text-black font-bold hover:bg-white bg-transparent'}`;
@@ -184,15 +209,26 @@ const ProfitLossReport = () => {
                 { label: 'NET OPERATING REVENUE', value: formatCurrency(safePnl.netOperatingRevenue) },
                 { label: '', value: '' },
                 { label: 'II. COST OF GOODS SOLD', value: '' },
+                ...(safePnl.openingStockValue > 0 ? [{ label: 'Opening Stock Value', value: formatCurrency(safePnl.openingStockValue) }] : []),
                 { label: 'Add: Gross Purchases', value: formatCurrency(safePnl.grossPurchases) },
                 { label: 'Less: Purchase Returns', value: `-${formatCurrency(safePnl.totalPurchaseReturns)}` },
+                { label: 'Less: Closing Stock Value (Inventory)', value: `-${formatCurrency(safePnl.closingStockValue)}` },
                 { label: 'NET COST OF GOODS SOLD', value: formatCurrency(safePnl.netCogs) },
                 { label: 'GROSS PROFIT', value: formatCurrency(safePnl.grossProfit) },
                 { label: '', value: '' },
-                { label: 'III. OPERATING EXPENSES', value: '' },
-                { label: 'TOTAL OPERATING EXPENSES', value: formatCurrency(safePnl.totalExpenses) },
+                { label: 'III. STORE OPERATING EXPENSES', value: '' },
+                ...operatingExpenses.map((e: any) => ({ label: `  ${e.name}`, value: formatCurrency(e.amount) })),
+                { label: 'TOTAL OPERATING EXPENSES', value: formatCurrency(safePnl.operatingExpensesTotal ?? safePnl.totalExpenses) },
                 { label: '', value: '' },
-                { label: 'NET PROFIT FOR PERIOD', value: formatCurrency(safePnl.netProfit) },
+                { label: 'STORE OPERATING NET PROFIT', value: formatCurrency(operatingProfitVal) },
+                ...(nonOperatingExpenses.length > 0 ? [
+                  { label: '', value: '' },
+                  { label: 'IV. OWNER DRAWINGS & FUND TRANSFERS', value: '' },
+                  ...nonOperatingExpenses.map((e: any) => ({ label: `  ${e.name} (${e.nature || 'Drawings/Transfer'})`, value: formatCurrency(e.amount) })),
+                  { label: 'TOTAL DRAWINGS & TRANSFERS', value: formatCurrency(safePnl.nonOperatingExpensesTotal || 0) },
+                  { label: '', value: '' },
+                  { label: 'NET CASH RETAINED AFTER DRAWINGS', value: formatCurrency(netRetainedVal) }
+                ] : [])
               ];
               exportTableToPdf(cols, rows, `PNL_${fromDate}_to_${toDate}`, `Profit & Loss Statement: ${fromDate} to ${toDate}`);
             }}
@@ -217,7 +253,7 @@ const ProfitLossReport = () => {
               <p className="text-[10px] uppercase tracking-wider opacity-80 m-0 leading-tight">Statement of Profit and Loss (P&L Ledger)</p>
             </div>
             <div className="bg-[#F59E0B] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
-              {fromDate} to {toDate}
+              {fromDate && toDate ? `${fromDate} to ${toDate}` : fromDate ? `From ${fromDate}` : toDate ? `Up to ${toDate}` : 'All Time'}
             </div>
           </div>
 
@@ -261,6 +297,16 @@ const ProfitLossReport = () => {
                   <div className="flex items-center gap-2"><span>II. COST OF GOODS SOLD (COGS)</span></div>
                   <div>AMOUNT</div>
                 </div>
+
+                {safePnl.openingStockValue > 0 && (
+                  <div className="flex justify-between py-1 text-black font-bold shrink-0">
+                    <span>Opening Stock Value</span>
+                    <div className="flex gap-2">
+                      <span className="text-black font-bold text-[10px] hidden sm:block text-right">Beg. Stock</span>
+                      <span className="font-bold text-right">{formatCurrency(safePnl.openingStockValue)}</span>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="flex justify-between py-1 text-black font-bold shrink-0">
                   <span>Add: Gross Purchases</span>
@@ -278,6 +324,14 @@ const ProfitLossReport = () => {
                   </div>
                 </div>
 
+                <div className="flex justify-between py-1 text-[#059669] shrink-0">
+                  <span>Less: Closing Stock Value (Inventory on Hand)</span>
+                  <div className="flex gap-2">
+                    <span className="opacity-70 text-[10px] hidden sm:block text-right">Stock Value</span>
+                    <span className="font-bold text-right">- {formatCurrency(safePnl.closingStockValue)}</span>
+                  </div>
+                </div>
+
                 <div className="flex justify-between py-1 font-bold text-[13px] px-2 mb-2 text-black font-bold bg-[#F9FAFB] rounded shrink-0">
                   <span>NET COST OF GOODS SOLD (COGS)</span>
                   <span>{formatCurrency(safePnl.netCogs)}</span>
@@ -286,38 +340,93 @@ const ProfitLossReport = () => {
                 <div className="flex justify-between py-1.5 text-black font-bold text-[14px] border-y-2 border-[#E5E7EB] mb-2 items-center px-2 shrink-0">
                   <span>GROSS PROFIT (NET REVENUE - COGS)</span>
                   <div className="flex flex-col items-end leading-tight">
-                    <span>{formatCurrency(safePnl.grossProfit)}</span>
+                    <span className={safePnl.grossProfit >= 0 ? 'text-green-700 font-bold' : 'text-red-600 font-bold'}>{formatCurrency(safePnl.grossProfit)}</span>
                     <span className="text-[10px] text-black font-bold font-normal">({grossProfitMargin.toFixed(1)}%)</span>
                   </div>
                 </div>
 
                 {/* 3. Operating Expenses */}
                 <div className="flex justify-between font-bold text-black font-bold border-b border-[#E5E7EB] pb-1 mb-1 shrink-0">
-                  <div className="flex items-center gap-2"><span>III. OPERATING EXPENSES</span></div>
+                  <div className="flex items-center gap-2"><span>III. STORE OPERATING EXPENSES</span></div>
                   <div>AMOUNT</div>
                 </div>
-                
 
+                {operatingExpenses.length === 0 ? (
+                  <div className="py-1 text-gray-500 italic text-[11px]">No operating expenses recorded in this period.</div>
+                ) : (
+                  operatingExpenses.map((exp: any, idx: number) => (
+                    <div key={idx} className="flex justify-between py-0.5 text-black font-medium text-[12px] shrink-0 border-b border-gray-50">
+                      <span className="pl-1">• {exp.name}</span>
+                      <span className="font-bold text-right">{formatCurrency(exp.amount)}</span>
+                    </div>
+                  ))
+                )}
 
-                <div className="flex justify-between py-1 font-bold text-[13px] px-2 mt-auto text-black font-bold shrink-0">
+                <div className="flex justify-between py-1 font-bold text-[13px] px-2 mt-1 mb-2 text-black font-bold bg-gray-50 rounded shrink-0">
                   <span>TOTAL OPERATING EXPENSES</span>
-                  <span className="text-[#EF4444]">{formatCurrency(safePnl.totalExpenses)}</span>
+                  <span className="text-[#EF4444]">{formatCurrency(safePnl.operatingExpensesTotal ?? safePnl.totalExpenses)}</span>
                 </div>
+
+                {/* Operating Net Profit Line */}
+                <div className="flex justify-between py-1.5 text-black font-bold text-[13px] bg-emerald-50/90 border border-emerald-200 rounded px-2 mb-2 items-center shrink-0">
+                  <span className="text-emerald-900">STORE OPERATING NET PROFIT</span>
+                  <div className="flex flex-col items-end leading-tight">
+                    <span className={operatingProfitVal >= 0 ? 'text-emerald-700 font-bold' : 'text-red-600 font-bold'}>
+                      {formatCurrency(operatingProfitVal)}
+                    </span>
+                    <span className="text-[10px] text-emerald-800 font-normal">({operatingProfitMargin.toFixed(1)}%)</span>
+                  </div>
+                </div>
+
+                {/* 4. Owner Drawings & Fund Transfers */}
+                {nonOperatingExpenses.length > 0 && (
+                  <div className="mt-1 mb-2">
+                    <div className="flex justify-between font-bold text-[#4B5563] border-b border-[#E5E7EB] pb-1 mb-1 shrink-0">
+                      <div className="flex items-center gap-2"><span>IV. OWNER DRAWINGS & FUND TRANSFERS</span></div>
+                      <div>AMOUNT</div>
+                    </div>
+
+                    {nonOperatingExpenses.map((exp: any, idx: number) => (
+                      <div key={idx} className="flex justify-between py-0.5 text-[#374151] text-[12px] shrink-0 border-b border-gray-50">
+                        <div className="flex flex-col pl-1">
+                          <span className="font-semibold">• {exp.name}</span>
+                          {exp.nature && <span className="text-[10px] text-gray-500 italic">{exp.nature}</span>}
+                        </div>
+                        <span className="font-bold text-right text-gray-700">{formatCurrency(exp.amount)}</span>
+                      </div>
+                    ))}
+
+                    <div className="flex justify-between py-1 font-bold text-[13px] px-2 mt-1 text-black font-bold bg-amber-50/80 rounded shrink-0">
+                      <span>TOTAL DRAWINGS & TRANSFERS</span>
+                      <span className="text-[#D97706]">{formatCurrency(safePnl.nonOperatingExpensesTotal || 0)}</span>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
           
           {/* Footer - Net Profit */}
-          <div className={`${isLoss ? 'bg-[#EF4444]' : 'bg-[#10B981]'} text-white px-4 py-3 sm:py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 shrink-0`}>
+          <div className={`${isLoss ? 'bg-[#EF4444]' : 'bg-[#10B981]'} text-white px-4 py-2.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 shrink-0`}>
             <div>
-              <h3 className="text-[15px] sm:text-[18px] font-bold tracking-wider m-0 leading-tight">NET {isLoss ? 'LOSS' : 'PROFIT'} FOR PERIOD</h3>
-              <p className="text-[10px] opacity-90 m-0 leading-tight mt-0.5">Gross Profit less Operating Expenses</p>
+              <h3 className="text-[15px] sm:text-[18px] font-bold tracking-wider m-0 leading-tight">
+                {isLoss ? 'STORE OPERATING NET LOSS' : 'STORE OPERATING NET PROFIT'}
+              </h3>
+              <p className="text-[10px] opacity-90 m-0 leading-tight mt-0.5">Gross Profit less Store Operating Expenses</p>
             </div>
             <div className="flex flex-col items-end leading-tight">
-              <span className="text-[22px] font-bold">{formatCurrency(safePnl.netProfit)}</span>
-              <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold mt-0.5">Margin: {netProfitMargin.toFixed(1)}%</span>
+              <span className="text-[22px] font-bold">{formatCurrency(operatingProfitVal)}</span>
+              <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold mt-0.5">Operating Margin: {operatingProfitMargin.toFixed(1)}%</span>
             </div>
           </div>
+          {nonOperatingExpenses.length > 0 && (
+            <div className="bg-[#1F2937] text-gray-200 px-4 py-1.5 flex justify-between items-center text-[11px] font-bold shrink-0 border-t border-gray-700">
+              <span className="text-gray-300">Net Retained Cash (After Owner Profit Drawings & Fund Transfers):</span>
+              <span className={netRetainedVal >= 0 ? 'text-emerald-400 text-[13px]' : 'text-rose-400 text-[13px]'}>
+                {formatCurrency(netRetainedVal)} ({netRetainedMargin.toFixed(1)}%)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Charts & Analytics */}
@@ -333,7 +442,7 @@ const ProfitLossReport = () => {
                   <BarChart data={barData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                     <XAxis dataKey="name" tick={{fontSize: 9}} interval={0} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={(val) => `RS ${val}`} tick={{fontSize: 9}} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(val) => `${settings?.currencySymbol || 'RM'} ${Number(val).toLocaleString()}`} tick={{fontSize: 9}} axisLine={false} tickLine={false} />
                     <Tooltip cursor={{fill: 'transparent'}} formatter={(val) => formatCurrency(val as number)} contentStyle={{ fontSize: '11px', borderRadius: '4px' }} />
                     <Bar dataKey="amount" radius={[4, 4, 0, 0]} maxBarSize={40}>
                       {barData.map((entry, index) => (
@@ -374,17 +483,23 @@ const ProfitLossReport = () => {
                Key Financial Ratios
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded p-2 text-center">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded p-1.5 text-center">
                 <p className="text-[10px] font-bold text-black font-bold mb-0.5">Gross Margin</p>
-                <p className={`text-[18px] font-bold leading-none ${grossProfitMargin < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                <p className={`text-[15px] font-bold leading-none ${grossProfitMargin < 0 ? 'text-red-500' : 'text-green-600'}`}>
                   {grossProfitMargin.toFixed(1)}%
                 </p>
               </div>
-              <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded p-2 text-center">
-                <p className="text-[10px] font-bold text-black font-bold mb-0.5">Net Margin</p>
-                <p className={`text-[18px] font-bold leading-none ${netProfitMargin < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                  {netProfitMargin.toFixed(1)}%
+              <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded p-1.5 text-center">
+                <p className="text-[10px] font-bold text-black font-bold mb-0.5">Operating Margin</p>
+                <p className={`text-[15px] font-bold leading-none ${operatingProfitMargin < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                  {operatingProfitMargin.toFixed(1)}%
+                </p>
+              </div>
+              <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded p-1.5 text-center">
+                <p className="text-[10px] font-bold text-black font-bold mb-0.5">Retained Margin</p>
+                <p className={`text-[15px] font-bold leading-none ${netRetainedMargin < 0 ? 'text-amber-500' : 'text-blue-600'}`}>
+                  {netRetainedMargin.toFixed(1)}%
                 </p>
               </div>
             </div>

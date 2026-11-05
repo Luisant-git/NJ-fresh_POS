@@ -17,11 +17,9 @@ export class ExpenseCategoriesService {
     const expenseWhere: any = {};
     if (query?.startDate || query?.endDate) {
       expenseWhere.date = {};
-      if (query.startDate) expenseWhere.date.gte = new Date(query.startDate);
+      if (query.startDate) expenseWhere.date.gte = new Date(`${query.startDate}T00:00:00+08:00`);
       if (query.endDate) {
-        const end = new Date(query.endDate);
-        end.setHours(23, 59, 59, 999);
-        expenseWhere.date.lte = end;
+        expenseWhere.date.lte = new Date(`${query.endDate}T23:59:59.999+08:00`);
       }
     }
 
