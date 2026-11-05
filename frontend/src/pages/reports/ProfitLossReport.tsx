@@ -10,8 +10,8 @@ import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 
 const ProfitLossReport = () => {
   const { formatCurrency, settings } = useSettings();
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [fromDate, setFromDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [toDate, setToDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [activePreset, setActivePreset] = useState<string>('month');
 
   const { data: pnl, isLoading, refetch } = useQuery({
