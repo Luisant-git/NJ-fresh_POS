@@ -47,23 +47,32 @@ const PurchaseReport = () => {
           paymentModeId: paymentMode || undefined,
         } 
       });
-      return data.map((p: any) => ({
-        id: p.id,
-        entryNo: `PUR-${p.id.toString().padStart(6, '0')}`,
-        invoiceNo: p.supplierInvoiceNo || '-',
-        date: getMalaysiaDateStr(p.date),
-        supplierName: p.supplier?.name || '-',
-        mode: p.paymentMode?.name || '-',
-        noOfBirds: p.items?.reduce((sum: number, item: any) => sum + (Number(item.noOfBirds) || 0), 0) || 0,
-        totalAmount: formatCurrency(p.subtotal),
-        taxAmount: formatCurrency(p.tax),
-        netAmount: formatCurrency(p.grandTotal),
-        rawGrandTotal: p.grandTotal,
-        rawSubtotal: p.subtotal,
-        rawNoOfBirds: p.items?.reduce((sum: number, item: any) => sum + (Number(item.noOfBirds) || 0), 0) || 0,
-        rawNoOfItems: p.items?.length || 0,
-        noOfItems: p.items?.length || 0,
-      }));
+      return data.map((p: any) => {
+        const items: any[] = p.items || [];
+        const units = Array.from(
+          new Set(
+            items
+              .map((item: any) => item.product?.unit?.shortCode || item.product?.unit?.name)
+              .filter(Boolean)
+          )
+        );
+        return {
+          id: p.id,
+          entryNo: `PUR-${p.id.toString().padStart(6, '0')}`,
+          invoiceNo: p.supplierInvoiceNo || '-',
+          date: getMalaysiaDateStr(p.date),
+          supplierName: p.supplier?.name || '-',
+          mode: p.paymentMode?.name || '-',
+          totalAmount: formatCurrency(p.subtotal),
+          taxAmount: formatCurrency(p.tax),
+          netAmount: formatCurrency(p.grandTotal),
+          rawGrandTotal: p.grandTotal,
+          rawSubtotal: p.subtotal,
+          rawNoOfItems: items.length,
+          noOfItems: items.length,
+          units: units.length ? units.join(', ') : '-',
+        };
+      });
     },
   });
 
@@ -82,7 +91,6 @@ const PurchaseReport = () => {
 
   const totalPurchasesAmount = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawGrandTotal) || 0), 0);
   const totalSubtotal = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawSubtotal) || 0), 0);
-  const totalBirds = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawNoOfBirds) || 0), 0);
   const totalItems = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawNoOfItems) || 0), 0);
 
   const [entriesPerPage, setEntriesPerPage] = useState(25);
@@ -251,7 +259,7 @@ const PurchaseReport = () => {
                   'Supplier Name': p.supplierName,
                   'Payment Mode': p.mode,
                   'No. of Items': p.noOfItems,
-                  'No. of Birds': p.noOfBirds,
+                  'Units': p.units,
                   'Total Amount': p.totalAmount,
 
                   'Net Amount': p.netAmount
@@ -263,7 +271,6 @@ const PurchaseReport = () => {
                   'Supplier Name': '',
                   'Payment Mode': 'TOTAL:',
                   'No. of Items': totalItems,
-                  'No. of Birds': totalBirds,
 
                   'Total Amount': formatCurrency(totalSubtotal),
 
@@ -288,7 +295,7 @@ const PurchaseReport = () => {
                   { header: 'Supplier Name', dataKey: 'supplierName' },
                   { header: 'Mode', dataKey: 'mode' },
                   { header: 'No. of Items', dataKey: 'noOfItems' },
-                  { header: 'No. of Birds', dataKey: 'noOfBirds' },
+                  { header: 'Units', dataKey: 'units' },
                   { header: 'Total Amount', dataKey: 'totalAmount' },
                   { header: 'Net Amount', dataKey: 'netAmount' },
 
@@ -300,7 +307,7 @@ const PurchaseReport = () => {
                   supplierName: '',
                   mode: 'TOTAL:',
                   noOfItems: totalItems.toString(),
-                  noOfBirds: totalBirds.toString(),
+                  units: '',
                   totalAmount: formatCurrency(totalSubtotal),
 
                   netAmount: formatCurrency(totalPurchasesAmount)
@@ -332,7 +339,7 @@ const PurchaseReport = () => {
                 <th className="px-4 py-3 border-r border-[#1E293B]">Supplier Name</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Mode</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-center">No. of Items</th>
-                <th className="px-4 py-3 border-r border-[#1E293B] text-center">No. of Birds</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-center">Units</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Total Amount</th>
                 {/* hidden */}
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Net Amount</th>
@@ -341,9 +348,9 @@ const PurchaseReport = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <TableLoader columns={10} />
+                <TableLoader columns={11} />
               ) : filteredPurchases.length === 0 ? (
-                <tr><td colSpan={10} className="text-center p-6 text-black font-bold">No purchase records found.</td></tr>
+                <tr><td colSpan={11} className="text-center p-6 text-black font-bold">No purchase records found.</td></tr>
               ) : (
                 paginatedPurchases.map((p: any, index: number) => (
                   <tr key={p.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
@@ -366,7 +373,7 @@ const PurchaseReport = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-black font-bold">{p.noOfItems}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-black font-bold">{p.noOfBirds === 0 ? '0' : p.noOfBirds}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-black font-bold">{p.units}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-bold">{p.totalAmount}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-[#10B981]">{p.netAmount}</td>
                     <td data-html2canvas-ignore="true" className="px-4 py-3 text-center">

@@ -113,10 +113,23 @@ export class PurchasesService {
       include: {
         supplier: true,
         paymentMode: true,
+        items: {
+          select: {
+            id: true,
+            quantity: true,
+            product: {
+              select: {
+                name: true,
+                code: true,
+                unit: { select: { id: true, name: true, shortCode: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: [
         { date: 'desc' },
-        { id: 'desc' }
+        { id: 'desc' },
       ],
     });
   }
