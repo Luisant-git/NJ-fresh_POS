@@ -334,7 +334,8 @@ const CustomerReceiptsReport = () => {
     try {
       setPrintingId(customerId);
       const res = await api.get(`/customer-receipts/unpaid-bills/${customerId}`);
-      const unpaidBills = res.data;
+      // Only print bills that still carry an outstanding (pending) balance
+      const unpaidBills = (res.data || []).filter((bill: any) => Number(bill.pending || 0) >= 0.01);
       const totals = unpaidBills.reduce((acc: any, bill: any) => {
         acc.total += Number(bill.total || 0);
         acc.returned += Number(bill.returned || 0);
