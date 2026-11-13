@@ -1,0 +1,26 @@
+# Environment files
+.env
+.env.*
+!.env.example
+*.env
+
+# Dependencies
+node_modules/
+
+# Production builds
+dist/
+dist-ssr/
+
+# Logs
+*.log
+logs/
+
+# System and editor files
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# WhatsApp auth
+.wwebjs_auth/
+.wwebjs_cache/
