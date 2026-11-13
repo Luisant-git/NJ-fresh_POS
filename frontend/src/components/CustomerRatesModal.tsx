@@ -85,7 +85,7 @@ export default function CustomerRatesModal({ customer, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white w-full max-w-3xl rounded-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-4xl rounded-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Modal Header */}
         <div className="bg-[#1E3A8A] text-white px-4 py-3 flex items-center justify-between shrink-0">
@@ -130,6 +130,7 @@ export default function CustomerRatesModal({ customer, onClose }: Props) {
                   <th className="px-3 py-2 border-r border-[#334155] w-12 text-center">#</th>
                   <th className="px-3 py-2 border-r border-[#334155] w-28">Code</th>
                   <th className="px-3 py-2 border-r border-[#334155]">Product Name</th>
+                  <th className="px-3 py-2 border-r border-[#334155] text-right w-32">Purchase Rate</th>
                   <th className="px-3 py-2 border-r border-[#334155] text-right w-32">Standard Rate</th>
                   <th className="px-3 py-2 text-center w-40">Fixed Rate for Customer</th>
                 </tr>
@@ -137,6 +138,7 @@ export default function CustomerRatesModal({ customer, onClose }: Props) {
               <tbody>
                 {filteredProducts.map((p: any, i: number) => {
                   const currentRateVal = rates[p.id] !== undefined ? rates[p.id] : '';
+                  const isBelowCost = Number(currentRateVal) > 0 && Number(currentRateVal) <= Number(p.purchaseRate);
                   return (
                     <tr key={p.id} className={`border-b border-gray-200 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
                       <td className="px-3 py-2 text-center font-bold text-black font-bold">{i + 1}</td>
@@ -144,6 +146,9 @@ export default function CustomerRatesModal({ customer, onClose }: Props) {
                       <td className="px-3 py-2 font-bold text-black font-bold flex items-center gap-1.5">
                         <Package size={14} className="text-blue-500 shrink-0" />
                         {p.name}
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold text-gray-600">
+                        {formatCurrency(p.purchaseRate || 0)}
                       </td>
                       <td className="px-3 py-2 text-right font-bold text-black font-bold">
                         {formatCurrency(p.sellingRate || 0)}
@@ -157,7 +162,16 @@ export default function CustomerRatesModal({ customer, onClose }: Props) {
                             placeholder="0.00"
                             value={currentRateVal}
                             onChange={(e) => handleRateChange(p.id, e.target.value)}
-                            className="w-28 px-2 py-1 border border-gray-300 rounded text-right font-bold text-blue-700 outline-none focus:border-blue-500 focus:bg-blue-50 transition-colors"
+                            className={`w-28 px-2 py-1 border rounded text-right font-bold outline-none transition-colors ${
+                              isBelowCost
+                                ? 'border-red-400 bg-red-50 text-red-700 focus:border-red-500'
+                                : 'border-gray-300 text-blue-700 focus:border-blue-500 focus:bg-blue-50'
+                            }`}
+                            title={
+                              isBelowCost
+                                ? `Warning: Rate is lower than or equal to purchase rate (${formatCurrency(p.purchaseRate || 0)})`
+                                : ''
+                            }
                           />
                         </div>
                       </td>
