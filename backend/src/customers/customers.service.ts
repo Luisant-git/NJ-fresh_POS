@@ -47,6 +47,11 @@ export class CustomersService {
   }
 
   async upsertCustomerRate(customerId: number, productId: number, rate: number) {
+    if (rate <= 0) {
+      return this.prisma.customerProductRate.deleteMany({
+        where: { customerId, productId },
+      });
+    }
     return this.prisma.customerProductRate.upsert({
       where: {
         customerId_productId: { customerId, productId },
@@ -57,12 +62,27 @@ export class CustomersService {
   }
 
   async setCustomerRates(customerId: number, rates: { productId: number, rate: number }[]) {
+    const validPositiveRates = (rates || []).filter(item => item.productId > 0 && Number(item.rate) > 0);
+    const activeProductIds = validPositiveRates.map(item => item.productId);
+
+    if (activeProductIds.length === 0) {
+      await this.prisma.customerProductRate.deleteMany({
+        where: { customerId },
+      });
+      return [];
+    }
+
+    await this.prisma.customerProductRate.deleteMany({
+      where: {
+        customerId,
+        productId: { notIn: activeProductIds },
+      },
+    });
+
     const results = [];
-    for (const item of rates) {
-      if (item.productId > 0) {
-        const res = await this.upsertCustomerRate(customerId, item.productId, item.rate);
-        results.push(res);
-      }
+    for (const item of validPositiveRates) {
+      const res = await this.upsertCustomerRate(customerId, item.productId, Number(item.rate));
+      results.push(res);
     }
     return results;
   }

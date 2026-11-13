@@ -24,7 +24,7 @@ export default function CustomerRatesModal({ customer, onClose }: Props) {
 
   // Fetch existing customer fixed rates
   const { data: existingRates = [], isLoading: isLoadingRates } = useQuery({
-    queryKey: ['customerRates', customer.id],
+    queryKey: ['customer-rates', customer.id],
     queryFn: async () => (await api.get(`/customers/${customer.id}/rates`)).data,
     enabled: !!customer?.id,
   });
@@ -46,6 +46,7 @@ export default function CustomerRatesModal({ customer, onClose }: Props) {
     },
     onSuccess: () => {
       toast.success(`Fixed rates updated for ${customer.name}`);
+      queryClient.invalidateQueries({ queryKey: ['customer-rates', customer.id] });
       queryClient.invalidateQueries({ queryKey: ['customerRates', customer.id] });
       onClose();
     },

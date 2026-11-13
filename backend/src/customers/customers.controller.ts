@@ -41,7 +41,9 @@ export class CustomersController {
   setCustomerRates(@Param('id') id: string, @Body() body: any) {
     if (Array.isArray(body)) {
       return this.customersService.setCustomerRates(+id, body);
-    } else if (body.productId) {
+    } else if (body?.rates && Array.isArray(body.rates)) {
+      return this.customersService.setCustomerRates(+id, body.rates);
+    } else if (body?.productId) {
       return this.customersService.upsertCustomerRate(+id, +body.productId, +body.rate);
     }
     return [];

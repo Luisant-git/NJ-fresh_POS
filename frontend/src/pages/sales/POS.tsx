@@ -137,7 +137,8 @@ const POS = () => {
 
   // Automatically sync item rates whenever customer or customerRates change
   useEffect(() => {
-    if (!settings?.enableCustomerRates || !selectedCustomerId || !products || products.length === 0) return;
+    if (editId) return; // Do not overwrite historical rates when editing an existing invoice
+    if (!settings?.enableCustomerRates || !products || products.length === 0) return;
 
     const currentItems = getValues('items');
     if (!currentItems || currentItems.length === 0) return;
@@ -146,7 +147,7 @@ const POS = () => {
       if (item.productId && Number(item.productId) > 0) {
         const prod = products.find((p: any) => p.id === Number(item.productId));
         if (prod) {
-          const customRate = customerRates.find((r: any) => r.productId === prod.id);
+          const customRate = selectedCustomerId ? customerRates.find((r: any) => Number(r.productId) === prod.id) : null;
           let targetRate: any = '';
           if (customRate && Number(customRate.rate) > 0) {
             targetRate = parseFloat(Number(customRate.rate).toFixed(2));
@@ -165,18 +166,21 @@ const POS = () => {
         }
       }
     });
-  }, [customerRates, selectedCustomerId, settings?.enableCustomerRates, products, getValues, setValue]);
+  }, [customerRates, selectedCustomerId, settings?.enableCustomerRates, products, editId, getValues, setValue]);
 
   // Mutation to quickly save custom fixed rate for customer from POS
   const saveCustomerRateMutation = useMutation({
     mutationFn: async ({ productId, rate }: { productId: number; rate: number }) => {
       if (!selectedCustomerId) return;
       await api.post(`/customers/${selectedCustomerId}/rates`, {
+        productId,
+        rate,
         rates: [{ productId, rate }]
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer-rates', selectedCustomerId] });
+      queryClient.invalidateQueries({ queryKey: ['customerRates', selectedCustomerId] });
       toast.success('Customer fixed rate saved!');
     },
     onError: () => {
@@ -276,18 +280,10 @@ const POS = () => {
 
       let rateToUse: any = product.sellingRate ? parseFloat(Number(product.sellingRate).toFixed(2)) : '';
       if (settings?.enableCustomerRates && selectedCustomerId && customerRates.length > 0) {
-        const customRate = customerRates.find((r: any) => r.productId === product.id);
+        const customRate = customerRates.find((r: any) => Number(r.productId) === product.id);
         if (customRate && Number(customRate.rate) > 0) {
           rateToUse = parseFloat(Number(customRate.rate).toFixed(2));
         }
-      }
-      if (rateToUse !== '' && rateToUse <= Number(product.purchaseRate)) {
-        toast.error(`Configured rate for ${product.name} is lower than purchase rate. Rate cleared.`);
-        rateToUse = '';
-      }
-      if (rateToUse !== '' && rateToUse <= Number(product.purchaseRate)) {
-        toast.error(`Configured rate for ${product.name} is lower than purchase rate. Rate cleared.`);
-        rateToUse = '';
       }
       if (rateToUse !== '' && rateToUse <= Number(product.purchaseRate)) {
         toast.error(`Configured rate for ${product.name} is lower than purchase rate. Rate cleared.`);
@@ -796,20 +792,28 @@ const POS = () => {
                             register(`items.${index}.rate`).onBlur(e);
                           }}
                         />
-                        {settings?.enableCustomerRates && !!selectedCustomerId && Number(watch(`items.${index}.productId`)) > 0 && Number(watch(`items.${index}.rate`)) > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const pId = Number(watch(`items.${index}.productId`));
-                              const rVal = Number(watch(`items.${index}.rate`));
-                              saveCustomerRateMutation.mutate({ productId: pId, rate: rVal });
-                            }}
-                            className="p-1 bg-green-50 text-green-600 border border-green-300 rounded hover:bg-green-600 hover:text-white transition-colors shrink-0"
-                            title="Save this rate as customer fixed rate"
-                          >
-                            <DollarSign size={11} />
-                          </button>
-                        )}
+                        {settings?.enableCustomerRates && !!selectedCustomerId && (() => {
+                          const pId = Number(watch(`items.${index}.productId`));
+                          if (!pId) return null;
+                          const customRateObj = customerRates.find((r: any) => Number(r.productId) === pId && Number(r.rate) > 0);
+                          if (!customRateObj) return null;
+
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const rVal = Number(watch(`items.${index}.rate`));
+                                if (rVal > 0) {
+                                  saveCustomerRateMutation.mutate({ productId: pId, rate: rVal });
+                                }
+                              }}
+                              className="p-1 bg-green-50 text-green-600 border border-green-300 rounded hover:bg-green-600 hover:text-white transition-colors shrink-0"
+                              title={`Customer fixed rate: ${formatCurrency(customRateObj.rate)} (Click to update)`}
+                            >
+                              <DollarSign size={11} />
+                            </button>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td data-label="Disc %" className="px-2 py-1 border-r border-[#E5E7EB]">
